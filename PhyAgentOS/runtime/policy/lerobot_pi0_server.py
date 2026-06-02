@@ -66,6 +66,8 @@ def action_to_numpy(action: Any) -> np.ndarray:
             if key in action:
                 return action_to_numpy(action[key])
     actions = np.asarray(action, dtype=np.float32)
+    if actions.ndim == 3 and actions.shape[0] == 1:
+        actions = actions[0]
     if actions.ndim == 1:
         actions = actions[None, :]
     if actions.ndim != 2:
@@ -111,10 +113,13 @@ class LeRobotPI0Policy:
         batch = self.preprocess(frame)
         with torch.inference_mode():
             try:
-                action = self.policy.select_action(batch)
+                action = self.policy.predict_action_chunk(batch)
+                n_action_steps = int(getattr(self.policy.config, "n_action_steps", 0) or 0)
+                if n_action_steps > 0:
+                    action = action[:, :n_action_steps]
             except Exception as first_error:
                 try:
-                    action = self.policy.select_action(frame)
+                    action = self.policy.select_action(batch)
                 except Exception:
                     raise first_error
             action = self.postprocess(action)
