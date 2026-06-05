@@ -33,7 +33,7 @@
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-FF574F) | 2026-05-29 | 基于 ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) 的MineCraft 就绪，以云端agent接入用户的本地服务器 |
-| ![v0.1.4](https://img.shields.io/badge/v0.1.3-47A882) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
+| ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
 | ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离，Game Agent & Benchmarking 就绪 |
 | ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | 感知插件体系：`SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` 可审计写回 |
 | ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP：`DummySimTarget` + `DummyAdapter` + `DummyClient` 串行链路 |

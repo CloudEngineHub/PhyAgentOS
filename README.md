@@ -33,7 +33,7 @@
 | Version | Date | Update |
 |:------|:-----|:-------|
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-FF574F) | 2026-05-29 | Based on ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) — Minecraft ready: cloud agent connects to user's local server |
-| ![v0.1.4](https://img.shields.io/badge/v0.1.3-47A882) | 2026-06-5 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
+| ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
 | ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) | 2026-05-25 | Strict separation of `PolicySkillRuntime` / `BuiltinSkillRuntime`; Game Agent & Benchmarking ready |
 | ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | Perception plugin system: `SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` auditable writeback |
 | ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP: `DummySimTarget` + `DummyAdapter` + `DummyClient` serial pipeline |
