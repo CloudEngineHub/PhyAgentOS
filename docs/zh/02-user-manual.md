@@ -46,7 +46,7 @@
 PhyAgentOS 是一个显式解耦的双轨运行架构：
 
 - **Track A（Agent / 大脑）**：负责理解用户输入、规划动作、调用工具、Critic 校验。通过 `paos agent` 或 `paos gateway` 启动。
-- **Track B（Runtime / 执行层）**：负责读取指令、驱动硬件、执行动作、回写状态。通过 `python -m PhyAgentOS.runtime.watchdog` 启动。
+- **Track B（Runtime / 执行层）**：负责 session 级执行监督、target/policy 调用、artifact 与环境状态写回。Runtime watchdog 会随 `paos agent` 或 `paos gateway` 自动启动；远端 target/policy server 按需单独部署。
 
 两者之间的共享状态通过工作区中的 Markdown 文件表达，而不是跨层直接 Python 调用。
 
@@ -60,14 +60,12 @@ PhyAgentOS 是一个显式解耦的双轨运行架构：
 ### 2.2.3 一次典型运行的完整闭环
 
 1. 运行 `paos onboard` 初始化配置与工作区
-2. 启动 Watchdog，安装 `EMBODIED.md`（机器人能力声明）
-3. 启动 `paos agent` 或 `paos gateway`
+2. 启动 `paos agent` 或 `paos gateway`
+3. Agent 自动创建/刷新 runtime workspace，并启动 session watchdog
 4. 用户输入自然语言任务
-5. Agent 读取 `ENVIRONMENT.md` 等工作区文件进行规划
-6. Critic 结合 `EMBODIED.md` 校验动作是否安全可行
-7. 校验通过的动作被写入 `ACTION.md` 或 `SESSIONS.md`
-8. Watchdog 读取并解析，调用驱动执行动作
-9. Watchdog 将最新状态回写到 `ENVIRONMENT.md`
+5. Agent 读取 `TARGETS.md`、`SKILLS.md`、`ENVIRONMENT.md` 等工作区文件进行规划
+6. Agent 将可执行任务追加到 `SESSIONS.md`
+7. Watchdog claim pending session，执行 preflight、运行 target/skill，并写回 result、artifact 与环境状态
 
 ---
 
@@ -118,19 +116,7 @@ paos onboard
 
 该命令会：创建/刷新 `~/.PhyAgentOS/config.json`、准备默认工作区、同步模板文件。
 
-### 第 3 步：启动 Runtime（Track B）
-
-打开终端 A：
-
-```bash
-python -m PhyAgentOS.runtime.watchdog
-```
-
-默认使用内置仿真驱动，零硬件即可跑通全链路。
-
-### 第 4 步：启动 Agent（Track A）
-
-打开终端 B：
+### 第 3 步：启动 Agent
 
 ```bash
 paos agent
@@ -142,12 +128,23 @@ paos agent
 看看桌面上有什么物体。
 ```
 
-### 无硬件验证管道
+如果只想单次调用，也可以使用：
 
 ```bash
-python scripts/init_runtime_workspace.py --workspace /tmp/paos_runtime_smoke
-python scripts/run_runtime_watchdog.py --workspace /tmp/paos_runtime_smoke --once
-# → session 标记 succeeded，结果写入 artifacts/
+paos agent -m "看看桌面上有什么物体"
+```
+
+### 第 4 步：连接远程 runtime 服务
+
+如果任务需要远程仿真或真实策略服务，先在对应机器启动 target/policy server。例如 LIBERO + pi0.5：
+
+```bash
+MUJOCO_GL=egl PYTHONWARNINGS=ignore \
+conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
+  --host 0.0.0.0 --port 9002
+
+conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_server \
+  --model-dir /path/to/pi05/checkpoint --host 0.0.0.0 --port 8000
 ```
 
 ---
@@ -219,13 +216,9 @@ python scripts/run_runtime_watchdog.py --workspace /tmp/paos_runtime_smoke --onc
 
 ### 2.6.1 仿真场景
 
-内置仿真驱动 `simulation` 是最快验证全链路的起点。
+本地 `paos agent` 是最快验证 Agent 与 runtime workspace 是否打通的起点。
 
 ```bash
-# 终端 1：启动仿真 Watchdog
-python -m PhyAgentOS.runtime.watchdog
-
-# 终端 2：启动 Agent
 paos agent
 ```
 

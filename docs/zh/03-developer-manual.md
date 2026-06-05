@@ -75,11 +75,13 @@ PhyAgentOS 的核心价值是将认知层与执行层通过显式协议解耦。
 
 | 文件 | 逻辑含义 |
 |------|---------|
+| `TARGETS.md` | target registry 与 endpoint / adapter / contract |
+| `SKILLS.md` | 可执行 skill runtime 声明 |
 | `ENVIRONMENT.md` | 环境状态真相 |
-| `EMBODIED.md` | 机器人能力真相 |
 | `SESSIONS.md` | 执行意图真相 |
-| `ACTION.md` | 动作队列真相 |
 | `LESSONS.md` | 失败经验真相 |
+
+`EMBODIED.md` / `ACTION.md` 仍用于部分 legacy HAL driver 流程；session-centered runtime 的正式执行入口是 `SESSIONS.md`。
 
 **只看代码不看文件会误解系统行为。**
 
@@ -293,10 +295,10 @@ class AgentLoop:
 ```
 
 工作流：
-1. 从工作区文件构建上下文（ENVIRONMENT.md、EMBODIED.md、LESSONS.md）
+1. 从工作区文件构建上下文（TARGETS.md、SKILLS.md、SESSIONS.md、ENVIRONMENT.md、LESSONS.md）
 2. 调用 LLM 进行规划和推理
 3. 处理工具调用（EmbodiedActionTool、SemanticNavigationTool 等）
-4. 将动作写入 ACTION.md / SESSIONS.md
+4. 将可执行任务写入 `SESSIONS.md`
 5. 管理对话历史
 
 #### Critic 校验框架
@@ -305,9 +307,9 @@ class AgentLoop:
 
 EmbodiedActionTool 的职责：
 - 在 fleet 模式下解析目标 `robot_id`
-- 为目标机器人定位 `EMBODIED.md`、`ENVIRONMENT.md`、`ACTION.md`
+- 为目标机器人定位 runtime workspace 和环境状态
 - 把动作草案、环境状态、能力声明交给 Critic
-- 校验通过时写入 `ACTION.md`
+- 校验通过时写入 `SESSIONS.md`
 - 校验失败时记录到 `LESSONS.md`
 
 新版 Critic 还校验：
@@ -402,9 +404,9 @@ Watchdog 默认从 `ACTION.md` 中提取第一个 JSON 代码块：
 ```
 1. Agent 形成动作意图
 2. EmbodiedActionTool 做 Critic 校验
-3. 校验通过后写入 ACTION.md / SESSIONS.md
-4. Watchdog 消费动作并执行
-5. 结果回写到 ENVIRONMENT.md / LESSONS.md
+3. 校验通过后写入 `SESSIONS.md`
+4. WatchdogSupervisor claim session，执行 preflight
+5. SessionRunner 运行 target/skill，结果回写到 `ENVIRONMENT.md` / `LESSONS.md` / artifacts
 ```
 
 排查时要区分：动作生成有问题 / Critic 校验拒绝 / Watchdog 执行失败 / 执行成功但环境未回写。
@@ -661,22 +663,21 @@ Sensor → ObservationProvider → PolicyServer → ActionChunk
 
 | 层级 | 内容 | 命令 |
 |------|------|------|
-| 1. 纯 Python 单测 | 接口、配置、注册、解析逻辑 | `pytest tests/test_hal_base_driver.py` |
-| 2. Driver 本地 smoke test | 直接启动 Watchdog | `python hal/hal_watchdog.py --driver <name>` |
-| 3. Dry-run 预检 | 对真实插件或远程运行时做预检 | preflight + dry-run |
-| 4. Agent 全链路联调 | Agent → Critic → ACTION → Watchdog → ENVIRONMENT 完整走通 | `paos agent` + Watchdog |
+| 1. 纯 Python 单测 | 接口、配置、注册、解析逻辑 | `pytest tests/` |
+| 2. Runtime contract/preflight | target/skill/adapter/bridge 兼容性 | runtime protocol tests |
+| 3. 远程服务验收 | 真实 target/policy server 连接 | LIBERO TargetWS + pi0.5 policy server |
+| 4. Agent 全链路联调 | Agent → SESSIONS → WatchdogSupervisor → SessionRunner → artifacts/ENVIRONMENT | `paos agent` |
 
 ### 关键测试文件
 
 | 测试文件 | 覆盖主题 |
 |---------|---------|
-| `tests/test_hal_external_plugins.py` | 插件注册与外部 driver 解析 |
-| `tests/test_hal_base_driver.py` | Driver 基础契约 |
-| `tests/test_hal_watchdog_driver_config.py` | `driver-config` 透传 |
-| `tests/test_go2_navigation_stack.py` | Go2 导航栈 |
-| `tests/test_perception_service.py` | 感知服务 |
+| `tests/runtime/test_runtime_protocol_alignment.py` | runtime 协议、adapter/bridge 注册 |
+| `tests/runtime/test_supervisor_single_session.py` | WatchdogSupervisor session 状态流 |
+| `tests/runtime/test_libero_remote_target.py` | LIBERO target proxy / adapter / preflight |
+| `tests/runtime/test_openpi_adapter_schema.py` | OpenPI policy adapter schema |
+| `tests/runtime/test_lerobot_pi0_server.py` | pi0 / pi0.5 policy loader |
 | `tests/test_commands.py` | CLI 命令 |
-| `tests/test_fleet_watchdog.py` | Fleet Watchdog 流程 |
 
 ### 最小测试命令
 
@@ -691,7 +692,7 @@ pytest tests/test_hal_external_plugins.py
 ### 真机/插件验证顺序
 
 ```
-preflight → dry-run → Watchdog 直连验证 → Agent 全链路验证
+protocol 单测 → preflight → 远程 target/policy server 验收 → Agent 全链路验证
 ```
 
 ---
@@ -735,11 +736,13 @@ preflight → dry-run → Watchdog 直连验证 → Agent 全链路验证
 
 | 功能 | 路径 |
 |------|------|
-| BaseDriver | `hal/base_driver.py` |
-| Watchdog | `hal/hal_watchdog.py` / `PhyAgentOS/runtime/watchdog/` |
-| 内置驱动 | `hal/drivers/` |
-| 机器人 Profile | `hal/profiles/` |
-| 驱动配置示例 | `examples/` |
+| Runtime Watchdog | `PhyAgentOS/runtime/watchdog/` |
+| Session Runner | `PhyAgentOS/runtime/sessions/` |
+| Target Runtime | `PhyAgentOS/runtime/targets/` |
+| LIBERO TargetWS | `PhyAgentOS/runtime/targets/remote/libero/` |
+| Skill Runtime | `PhyAgentOS/runtime/skills/` |
+| Target/Policy Adapter | `PhyAgentOS/runtime/adapters/` |
+| OpenPI Policy Client/Server | `PhyAgentOS/runtime/policy/openpi/` |
 | Agent Loop | `PhyAgentOS/agent/loop.py` |
 | EmbodiedActionTool | `PhyAgentOS/agent/tools/embodied.py` |
 | 语义导航工具 | `PhyAgentOS/agent/tools/target_navigation.py` |
@@ -751,6 +754,7 @@ preflight → dry-run → Watchdog 直连验证 → Agent 全链路验证
 | Skill 系统 | `PhyAgentOS/agent/skills.py` |
 | CLI 入口 | `PhyAgentOS/cli/commands.py` |
 | 测试套件 | `tests/` |
+| Legacy HAL Driver | `hal/` |
 
 ### 旧模块 → 新模块映射（Runtime V2 重构）
 

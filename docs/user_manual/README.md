@@ -117,7 +117,8 @@ pip install pybullet
 - `paos onboard`
 - `paos agent`
 - `paos gateway`
-- `python hal/hal_watchdog.py --driver simulation`
+- `python scripts/init_runtime_workspace.py --workspace <path>`（开发/验收时手动生成 runtime 协议文件）
+- `python hal/hal_watchdog.py --driver simulation`（legacy HAL driver 调试）
 
 ## 4. 首次初始化：配置文件与工作区
 

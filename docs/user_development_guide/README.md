@@ -50,8 +50,8 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 
 - **Track A：Agent / Planner / Critic / Tooling**
   - 负责自然语言理解、规划、工具调用、动作校验、记忆与编排
-- **Track B：HAL / Driver / Watchdog**
-  - 负责把动作意图映射到具体机器人或仿真环境，并将运行结果回写
+- **Track B：Runtime / Watchdog / SessionRunner / Target**
+  - 负责 session 级执行监督、target/policy 调用、artifact 与环境状态写回
 - **中间层协议**
   - 不是 RPC-first，也不是把所有状态藏在对象实例里
   - 而是优先通过工作区中的 Markdown 文件暴露共享状态
@@ -62,13 +62,15 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 
 在 PhyAgentOS 中，下列文件通常比类图更重要：
 
+- `TARGETS.md`
+- `SKILLS.md`
+- `SESSIONS.md`
 - `ENVIRONMENT.md`
-- `EMBODIED.md`
-- `ACTION.md`
 - `LESSONS.md`
 - `TASK.md`
 - `ORCHESTRATOR.md`
-- `ROBOTS.md`（Fleet 模式）
+
+`EMBODIED.md` / `ACTION.md` 仍用于部分 legacy HAL driver 流程；当前 session-centered runtime 的正式执行入口是 `SESSIONS.md`。
 
 它们共同构成运行时“真实状态面”。如果你只看代码、不看这些文件，很容易误解系统是怎么工作的。文件职责详见 [COMMUNICATION.md](COMMUNICATION.md) 与本文第 4、7 章。
 
@@ -82,8 +84,8 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 - **fleet 模式**
   - 一个共享工作区 + 多个机器人工作区
   - Agent 在共享工作区上做规划
-  - Watchdog 在机器人工作区中消费本机 `ACTION.md`
-  - Critic 会针对目标机器人的运行时 `EMBODIED.md` 做校验
+  - Runtime workspace 中可以存在多个 targets 与多个 sessions
+  - WatchdogSupervisor 按 session claim / preflight / execute / writeback
 
 这意味着：任何涉及具身动作、导航、连接状态或多机器人任务的功能，都应该显式考虑 single / fleet 两种运行语义。
 
@@ -93,8 +95,8 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 
 | 路径 | 作用 |
 | --- | --- |
-| [../PhyAgentOS](../../PhyAgentOS) | Track A 主体：Agent、CLI、Provider、Channel、Template、Session、Heartbeat 等 |
-| [../hal](../../hal) | Track B 主体：驱动、Watchdog、感知、导航、ROS2、仿真 |
+| [../PhyAgentOS](../../PhyAgentOS) | Agent 与 runtime 主体：CLI、Provider、Channel、Template、Session、Watchdog、Target、Skill 等 |
+| [../hal](../../hal) | Legacy HAL driver：旧版驱动、导航、ROS2、仿真入口 |
 | [../bridge](../../bridge) | 网桥相关代码，偏服务化/渠道接入配套 |
 | [docs](..) | 项目文档与说明 |
 | [../examples](../../examples) | 驱动配置样例 |
@@ -117,12 +119,14 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 
 | 路径 | 说明 |
 | --- | --- |
-| [../hal/hal_watchdog.py](../../hal/hal_watchdog.py) | HAL Watchdog 主入口 |
-| [../hal/base_driver.py](../../hal/base_driver.py) | 所有驱动都要遵守的最小抽象接口 |
-| [../hal/drivers](../../hal/drivers) | 内置 driver 注册与实现 |
-| [../hal/plugins.py](../../hal/plugins.py) | 外部插件注册、解析与激活 |
-| [../hal/profiles](../../hal/profiles) | 机器人/仿真实体 profile 来源 |
-| [../hal/navigation](../../hal/navigation) | 导航后端与目标导航相关逻辑 |
+| [../PhyAgentOS/runtime/watchdog](../../PhyAgentOS/runtime/watchdog) | WatchdogSupervisor 与 session 监督状态机 |
+| [../PhyAgentOS/runtime/sessions](../../PhyAgentOS/runtime/sessions) | SessionRunner / TargetSessionHandle |
+| [../PhyAgentOS/runtime/targets](../../PhyAgentOS/runtime/targets) | target runtime 与远端 proxy |
+| [../PhyAgentOS/runtime/targets/remote/libero](../../PhyAgentOS/runtime/targets/remote/libero) | LIBERO benchmark TargetWS server + proxy |
+| [../PhyAgentOS/runtime/skills](../../PhyAgentOS/runtime/skills) | PolicySkillRuntime / BuiltinSkillRuntime |
+| [../PhyAgentOS/runtime/adapters](../../PhyAgentOS/runtime/adapters) | TargetAdapter / PolicyAdapter / ActionBridge |
+| [../PhyAgentOS/runtime/policy/openpi](../../PhyAgentOS/runtime/policy/openpi) | OpenPI client 与 LeRobot pi0-family policy server |
+| [../hal](../../hal) | Legacy HAL driver 代码，保留给旧驱动与特定真机插件流程 |
 | [../hal/perception](../../hal/perception) | 感知、几何/语义融合与环境写回 |
 | [../hal/ros2](../../hal/ros2) | ROS2 bridge 与 adapter |
 | [../hal/simulation](../../hal/simulation) | 仿真场景与场景文档读写 |
@@ -212,13 +216,13 @@ paos onboard
 一个开发者应当掌握如下生命周期：
 
 1. `paos onboard` 准备模板/目录
-2. Watchdog 启动时把 profile 安装为运行时 `EMBODIED.md`
-3. Watchdog 根据驱动健康状态回写 `ENVIRONMENT.md`
-4. Agent 根据环境状态规划动作
-5. Critic 根据 `EMBODIED.md` 与 `ENVIRONMENT.md` 验证动作
-6. 通过验证后将动作写入 `ACTION.md`
-7. Watchdog 消费动作并再次更新环境
-8. 如果动作被拒绝，则将经验写入 `LESSONS.md`
+2. `paos agent` / `paos gateway` 启动时自动创建 runtime workspace，并启动 session watchdog
+3. `RuntimeWorkspaceManager` 写入当前启用 target 的 `ENVIRONMENT.md` 快照
+4. Agent 根据 `TARGETS.md`、`SKILLS.md`、`ENVIRONMENT.md` 等状态规划
+5. Agent 将可执行任务追加到 `SESSIONS.md`
+6. WatchdogSupervisor claim pending session，执行 compatibility preflight
+7. SessionRunner 通过 TargetSessionHandle 运行 target/skill，并写回 artifact、session result 与环境状态
+8. 如果 preflight 或执行失败，则将经验写入 `LESSONS.md`
 
 ## 5. 运行入口与开发期调试方式
 

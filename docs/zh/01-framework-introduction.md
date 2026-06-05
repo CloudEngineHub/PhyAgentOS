@@ -82,7 +82,7 @@ Track A (Agent)          工作区文件           Track B (Runtime)
 | 轨道 | 职责 | 入口 |
 |------|------|------|
 | **Track A（认知层）** | 理解用户意图、规划动作、校验安全、管理记忆 | `paos agent` / `paos gateway` |
-| **Track B（执行层）** | 读取指令、驱动硬件、执行动作、回写状态 | `python -m PhyAgentOS.runtime.watchdog` |
+| **Track B（执行层）** | session 级执行监督、target/policy 调用、artifact 与环境状态写回 | 随 `paos agent` / `paos gateway` 自动启动 |
 
 两轨道之间通过文件协议边界严格隔离。Track A 不知道电机型号，Track B 不知道 LLM Prompt。
 
@@ -228,13 +228,13 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 
 ## 1.6 架构演进路线
 
-### 当前架构（v0.2.1，Driver-Centered HAL）
+### 当前架构（Session-Centered Runtime）
 
-当前 Track B 以 `BaseDriver` 为中心：observe / execute / profile / safety 耦合在一个子类中。Track A 与 Track B 通过 `ACTION.md`（原子动作队列）通信。
+当前 Track B 以 session 为中心：`WatchdogSupervisor` 监督 session 状态流，`SessionRunner` 负责 target lifecycle，`TargetSessionHandle` 是 policy/builtin skill 访问 target 的唯一执行面。Track A 与 Track B 通过 `TARGETS.md`、`SKILLS.md`、`SESSIONS.md`、`ENVIRONMENT.md` 等文件协议通信。
 
-### 重构目标（Session-Centered Runtime）
+### Legacy HAL 兼容
 
-`plans/` 目录中的文档（非普通计划，是架构规格）定义了从 Driver-Centered HAL 到 Session-Centered Runtime 的升级方案：
+旧版 Driver-Centered HAL 仍保留给部分历史 driver 和真机插件流程。当前 runtime 的正式执行入口已经迁移到 session schema：
 
 | 旧模块 | 新模块 | 说明 |
 |--------|--------|------|
@@ -403,20 +403,28 @@ Phase 2: 深度演进
 
 ### 启动示例
 
-**无硬件 Smoke Test**：
+**本地 Agent + Runtime workspace**：
 ```bash
-python scripts/init_runtime_workspace.py --workspace /tmp/paos_runtime_smoke
-python scripts/run_runtime_watchdog.py --workspace /tmp/paos_runtime_smoke --once
-# → session 标记 succeeded，结果写入 artifacts/
+paos onboard
+paos agent
 ```
 
-**仿真机械臂操控**：
-```bash
-# 终端 1: 启动 Runtime
-python -m PhyAgentOS.runtime.watchdog
+`paos agent` / `paos gateway` 会自动创建 runtime workspace 并启动 session watchdog。
+Agent 根据 `TARGETS.md` 与 `SKILLS.md` 规划，并向 `SESSIONS.md` 追加待执行 session。
 
-# 终端 2: 启动 Agent
-paos agent -m "把桌上的红色方块拿起来"
+**真实 LIBERO benchmark + pi0.5 policy**：
+```bash
+# LIBERO benchmark TargetWS 机器
+MUJOCO_GL=egl PYTHONWARNINGS=ignore \
+conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
+  --host 0.0.0.0 --port 9002
+
+# pi0.5 policy 机器
+conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_server \
+  --model-dir /path/to/pi05/checkpoint --host 0.0.0.0 --port 8000
+
+# Agent 侧
+paos agent -m "运行已配置的 LIBERO benchmark 任务"
 ```
 
 **Isaac Sim 高保真仿真**：
@@ -452,8 +460,12 @@ PhyAgentOS/
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
+│   │   ├── libero/            #   LIBERO target adapter
+│   │   └── openpi/            #   OpenPI policy adapters
+│   ├── policy/openpi/         #   OpenPI client + LeRobot pi0-family server
 │   ├── perception/            #   感知运行时 / EnvironmentWriter
 │   ├── preflight/             #   RuntimeCompatibilityPreflight
 │   └── schemas/               #   Pydantic Schema

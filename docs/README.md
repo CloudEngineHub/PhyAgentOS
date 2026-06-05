@@ -28,7 +28,7 @@ PhyAgentOS 文档体系由三部分组成，分别面向不同读者群：
 
 - 框架版本：v0.2.1
 - 文档版本：v1.0
-- 最后更新：2026-05-31
+- 最后更新：2026-06-05
 
 ---
 
@@ -56,4 +56,4 @@ The PhyAgentOS documentation consists of three parts targeting different audienc
 
 - Framework Version: v0.2.1
 - Document Version: v1.0
-- Last Updated: 2026-05-31
+- Last Updated: 2026-06-05

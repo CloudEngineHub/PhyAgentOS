@@ -33,6 +33,7 @@
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-FF574F) | 2026-05-29 | 基于 ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) 的MineCraft 就绪，以云端agent接入用户的本地服务器 |
+| ![v0.1.4](https://img.shields.io/badge/v0.1.3-47A882) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
 | ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离，Game Agent & Benchmarking 就绪 |
 | ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | 感知插件体系：`SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` 可审计写回 |
 | ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP：`DummySimTarget` + `DummyAdapter` + `DummyClient` 串行链路 |
@@ -76,7 +77,7 @@
 <tr>
   <td>🧩</td>
   <td><b>Adapter + Bridge</b></td>
-  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> 三段解耦，<code>AdapterPlan</code> 自动编排，消灭 target×skill 组合爆炸</td>
+  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> 三段解耦，并显式声明 observation/action 契约；<code>AdapterPlan</code> 自动编排，消灭 target×skill 组合爆炸</td>
 </tr>
 <tr>
   <td>⚡</td>
@@ -86,7 +87,7 @@
 <tr>
   <td>🛡️</td>
   <td><b>Strict Preflight</b></td>
-  <td>10 项前置校验（target / sensor / perception / contract / tool），不合格直接 <code>rejected</code></td>
+  <td>运行时前置校验（target / sensor / perception / adapter contract / action contract / tool），不合格直接 <code>rejected</code></td>
 </tr>
 <tr>
   <td>📝</td>
@@ -138,10 +139,10 @@ paos onboard
 <td align="center">3</td>
 <td>
 
-**终端 1：启动 Runtime（Track B）**
+**启动 Agent**
 
 ```bash
-python -m PhyAgentOS.runtime.watchdog
+paos agent
 ```
 </td>
 </tr>
@@ -149,21 +150,28 @@ python -m PhyAgentOS.runtime.watchdog
 <td align="center">4</td>
 <td>
 
-**终端 2：启动 Agent（Track A）**
+**可选：连接 Runtime 服务**
 
 ```bash
-paos agent
+# LIBERO benchmark TargetWS 机器
+MUJOCO_GL=egl PYTHONWARNINGS=ignore \
+conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
+  --host 0.0.0.0 --port 9002
+
+# pi0.5 policy 机器
+conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_server \
+  --model-dir /path/to/pi05/checkpoint --host 0.0.0.0 --port 8000
 ```
 </td>
 </tr>
 </table>
 
-在 Agent CLI 中输入自然语言指令即可驱动硬件。无需硬件？运行 Smoke Test 验证全链路：
+`paos agent` 和 `paos gateway` 会自动创建 runtime workspace，并启动
+session watchdog。Runtime target 由 `TARGETS.md` 声明；Agent 通过向
+`SESSIONS.md` 追加 session 来排队执行任务。
 
 ```bash
-python scripts/init_runtime_workspace.py --workspace /tmp/paos_runtime_smoke
-python scripts/run_runtime_watchdog.py --workspace /tmp/paos_runtime_smoke --once
-# → session 标记 succeeded，结果写入 artifacts/
+paos agent -m "运行已配置的 LIBERO benchmark 任务"
 ```
 
 ---
@@ -179,8 +187,12 @@ PhyAgentOS/
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
+│   │   ├── libero/            #   LIBERO target adapter
+│   │   └── openpi/            #   OpenPI policy adapters
+│   ├── policy/openpi/         #   OpenPI client + LeRobot pi0-family server
 │   ├── perception/            #   感知运行时 / EnvironmentWriter
 │   ├── preflight/             #   RuntimeCompatibilityPreflight
 │   └── schemas/               #   Pydantic Schema
