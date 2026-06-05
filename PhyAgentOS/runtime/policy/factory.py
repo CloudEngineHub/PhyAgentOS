@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from PhyAgentOS.runtime.policy.base_client import BasePolicyClient
 from PhyAgentOS.runtime.policy.dummy_client import DummyPolicyClient
-from PhyAgentOS.runtime.policy.openpi_client import OpenPIClientPolicyWrapper
+from PhyAgentOS.runtime.policy.openpi.client import OpenPIClientPolicyWrapper
 from PhyAgentOS.runtime.watchdog.errors import PolicyConnectionError
 
 

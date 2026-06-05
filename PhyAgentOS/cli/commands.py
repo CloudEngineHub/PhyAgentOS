@@ -41,6 +41,7 @@ app = typer.Typer(
 
 console = Console()
 EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit", ":q"}
+RUNTIME_PROTOCOL_TEMPLATE_FILES = {"TARGETS.md", "SKILLS.md", "SESSIONS.md"}
 
 # ---------------------------------------------------------------------------
 # CLI input: prompt_toolkit for editing, paste, history, and display
@@ -211,7 +212,7 @@ def onboard():
         if not workspace.exists():
             workspace.mkdir(parents=True, exist_ok=True)
             console.print(f"[green]✓[/green] Created workspace at {workspace}")
-        sync_workspace_templates(workspace)
+        sync_workspace_templates(workspace, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
 
     console.print(f"\n{__logo__} PhyAgentOS is ready!")
     console.print("\nNext steps:")
@@ -311,6 +312,28 @@ def _print_deprecated_memory_window_notice(config: Config) -> None:
         )
 
 
+def _start_runtime_workspace_manager(config: Config):
+    """Provision runtime workspace and start the session watchdog when enabled."""
+    from PhyAgentOS.runtime.workspace import RuntimeWorkspaceManager
+
+    manager = RuntimeWorkspaceManager(config)
+    report = manager.start_watchdog()
+    if config.runtime.enabled:
+        console.print(f"[green]✓[/green] Runtime workspace: {report.workspace}")
+        if report.created:
+            console.print(f"  [dim]Created runtime files: {', '.join(report.created)}[/dim]")
+        if report.updated:
+            console.print(f"  [dim]Updated runtime files: {', '.join(report.updated)}[/dim]")
+        if report.enabled_targets or report.disabled_targets:
+            console.print(
+                "  [dim]Target enable overrides: "
+                f"enabled={report.enabled_targets or []}, disabled={report.disabled_targets or []}[/dim]"
+            )
+        if report.watchdog_started:
+            console.print("[green]✓[/green] Runtime watchdog started")
+    return manager
+
+
 # ============================================================================
 # Gateway / Server
 # ============================================================================
@@ -348,7 +371,8 @@ def gateway(
     if registry.is_fleet:
         registry.sync_layout()
     else:
-        sync_workspace_templates(config.workspace_path)
+        sync_workspace_templates(config.workspace_path, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
+    runtime_manager = _start_runtime_workspace_manager(config)
     bus = MessageBus()
     provider = _make_provider(config)
     session_manager = SessionManager(config.workspace_path)
@@ -497,6 +521,7 @@ def gateway(
             heartbeat.stop()
             cron.stop()
             agent.stop()
+            runtime_manager.stop_watchdog()
             await channels.stop_all()
 
     asyncio.run(run())
@@ -534,7 +559,8 @@ def agent(
     if registry.is_fleet:
         registry.sync_layout()
     else:
-        sync_workspace_templates(config.workspace_path)
+        sync_workspace_templates(config.workspace_path, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
+    runtime_manager = _start_runtime_workspace_manager(config)
 
     bus = MessageBus()
     provider = _make_provider(config)
@@ -584,10 +610,13 @@ def agent(
     if message:
         # Single message mode — direct call, no bus needed
         async def run_once():
-            with _thinking_ctx():
-                response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
-            _print_agent_response(response, render_markdown=markdown)
-            await agent_loop.close_mcp()
+            try:
+                with _thinking_ctx():
+                    response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
+                _print_agent_response(response, render_markdown=markdown)
+            finally:
+                runtime_manager.stop_watchdog()
+                await agent_loop.close_mcp()
 
         asyncio.run(run_once())
     else:
@@ -689,6 +718,7 @@ def agent(
                         break
             finally:
                 agent_loop.stop()
+                runtime_manager.stop_watchdog()
                 outbound_task.cancel()
                 await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
                 await agent_loop.close_mcp()

@@ -1,4 +1,4 @@
-"""LIBERO observation adapter for remote pi0.5 OpenPI-compatible policies."""
+"""pi0.5 adapter for OpenPI-compatible policy payloads."""
 
 from __future__ import annotations
 
@@ -10,8 +10,20 @@ from PhyAgentOS.runtime.adapters.openpi.base_openpi_adapter import BaseOpenPIAda
 from PhyAgentOS.runtime.watchdog.errors import AdapterError
 
 
-class LiberoPI05Adapter(BaseOpenPIAdapter):
-    """Map canonical PhyAgentOS observations to LIBERO/OpenPI policy inputs."""
+class OpenPIPi05Adapter(BaseOpenPIAdapter):
+    """Map canonical PhyAgentOS observations to pi0.5 OpenPI policy inputs."""
+
+    def input_observation_contract(self) -> dict[str, Any]:
+        return {
+            "sensors": {
+                "front_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+                "wrist_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+                "proprio": {"kind": "vector", "dtype": "float32", "shape": [8]},
+            }
+        }
+
+    def output_action_contract(self) -> dict[str, Any]:
+        return {"actions": {"dtype": "float32", "shape": ["T", 7]}}
 
     def to_policy_input(
         self,
@@ -24,13 +36,13 @@ class LiberoPI05Adapter(BaseOpenPIAdapter):
             wrist_image = sensors["wrist_rgb"]["data"]
             state = sensors["proprio"]["data"]
         except KeyError as exc:
-            raise AdapterError(f"LIBERO pi0.5 observation missing key: {exc.args[0]}") from exc
+            raise AdapterError(f"OpenPI pi0.5 observation missing key: {exc.args[0]}") from exc
 
         image_array = self._image_array(image, "front_rgb")
         wrist_array = self._image_array(wrist_image, "wrist_rgb")
         state_array = np.asarray(state, dtype=np.float32)
         if state_array.shape != (8,):
-            raise AdapterError(f"LIBERO pi0.5 state must have shape [8], got {state_array.shape}")
+            raise AdapterError(f"OpenPI pi0.5 state must have shape [8], got {state_array.shape}")
 
         return {
             "observation/image": image_array,
@@ -50,11 +62,11 @@ class LiberoPI05Adapter(BaseOpenPIAdapter):
     def _image_array(self, image: Any, name: str) -> np.ndarray:
         array = np.asarray(image)
         if array.size == 0:
-            raise AdapterError(f"LIBERO pi0.5 `{name}` image is empty")
+            raise AdapterError(f"OpenPI pi0.5 `{name}` image is empty")
         if array.ndim != 3:
-            raise AdapterError(f"LIBERO pi0.5 `{name}` image must have rank 3, got {array.shape}")
+            raise AdapterError(f"OpenPI pi0.5 `{name}` image must have rank 3, got {array.shape}")
         if array.shape[-1] != 3 and array.shape[0] != 3:
-            raise AdapterError(f"LIBERO pi0.5 `{name}` image must be HWC or CHW RGB, got {array.shape}")
+            raise AdapterError(f"OpenPI pi0.5 `{name}` image must be HWC or CHW RGB, got {array.shape}")
         if np.issubdtype(array.dtype, np.floating):
             array = np.clip(array, 0.0, 1.0)
             array = (array * 255.0).astype(np.uint8)

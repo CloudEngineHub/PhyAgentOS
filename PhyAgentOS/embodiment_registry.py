@@ -9,6 +9,7 @@ from PhyAgentOS.config.schema import Config, EmbodimentInstanceConfig
 from PhyAgentOS.utils.helpers import ensure_dir, load_environment_doc, sync_workspace_templates
 
 _PROFILES_DIR = Path(__file__).resolve().parent.parent / "profiles"
+_RUNTIME_PROTOCOL_TEMPLATE_FILES = {"TARGETS.md", "SKILLS.md", "SESSIONS.md"}
 
 
 @dataclass(frozen=True)
@@ -92,13 +93,13 @@ class EmbodimentRegistry:
     def sync_layout(self) -> list[str]:
         created: list[str] = []
         if not self.is_fleet:
-            sync_workspace_templates(self.shared_workspace)
+            sync_workspace_templates(self.shared_workspace, exclude=_RUNTIME_PROTOCOL_TEMPLATE_FILES)
             return created
 
         ensure_dir(self.shared_workspace)
         created.extend(sync_workspace_templates(
             self.shared_workspace,
-            exclude={"ACTION.md", "EMBODIED.md"},
+            exclude={"ACTION.md", "EMBODIED.md", *_RUNTIME_PROTOCOL_TEMPLATE_FILES},
         ))
 
         for instance in self.instances(enabled_only=True):

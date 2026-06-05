@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import http
+import json
 import time
 import traceback
 from pathlib import Path
@@ -16,16 +17,48 @@ from PhyAgentOS.runtime.policy.msgpack_numpy import packb, unpackb
 from PhyAgentOS.runtime.watchdog.errors import PolicyProtocolError
 
 
-def import_lerobot() -> tuple[Any, Any]:
+# Map a LeRobot checkpoint `config.json` ``type`` to its policy class import path.
+_POLICY_IMPORTS: dict[str, tuple[str, str]] = {
+    "pi0": ("lerobot.policies.pi0", "PI0Policy"),
+    "pi05": ("lerobot.policies.pi05", "PI05Policy"),
+    "pi0fast": ("lerobot.policies.pi0fast", "PI0FASTPolicy"),
+}
+
+
+def read_policy_type(model_dir: Path) -> str:
+    """Return the policy ``type`` recorded in the checkpoint ``config.json``."""
+    config_path = model_dir / "config.json"
+    if not config_path.exists():
+        raise PolicyProtocolError(f"expected config.json under: {model_dir}")
     try:
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise PolicyProtocolError(f"failed to parse {config_path}: {exc}") from exc
+    policy_type = config.get("type")
+    if not isinstance(policy_type, str):
+        raise PolicyProtocolError(f"config.json missing string `type`: {config_path}")
+    return policy_type
+
+
+def import_lerobot(policy_type: str) -> tuple[Any, Any]:
+    if policy_type not in _POLICY_IMPORTS:
+        supported = ", ".join(sorted(_POLICY_IMPORTS))
+        raise PolicyProtocolError(f"unsupported LeRobot policy type `{policy_type}`; supported: {supported}")
+    module_name, class_name = _POLICY_IMPORTS[policy_type]
+    try:
+        import importlib
+
         from lerobot.policies.factory import make_pre_post_processors
-        from lerobot.policies.pi0 import PI0Policy
-    except ModuleNotFoundError as exc:
+
+        policy_module = importlib.import_module(module_name)
+        policy_class = getattr(policy_module, class_name)
+    except (ModuleNotFoundError, AttributeError) as exc:
         raise SystemExit(
-            "Missing LeRobot PI0 policy dependencies. Run this server in the lerobot-pi "
-            "environment that can execute openpi/scripts/minimal_lerobot_pi0_infer.py."
+            f"Missing LeRobot policy dependencies for type `{policy_type}` "
+            f"({module_name}.{class_name}). Run this server in the `lerobotpi` "
+            "environment created with `pip install 'lerobot[pi]@git+https://github.com/huggingface/lerobot.git'`."
         ) from exc
-    return PI0Policy, make_pre_post_processors
+    return policy_class, make_pre_post_processors
 
 
 def libero_observation_to_lerobot_frame(
@@ -77,6 +110,20 @@ def action_to_numpy(action: Any) -> np.ndarray:
     return np.ascontiguousarray(actions[:, :7], dtype=np.float32)
 
 
+def _slice_action_steps(action: Any, n_action_steps: int) -> Any:
+    ndim = getattr(action, "ndim", None)
+    if ndim is None:
+        try:
+            ndim = np.ndim(action)
+        except Exception:
+            return action
+    if int(ndim) == 3:
+        return action[:, :n_action_steps]
+    if int(ndim) == 2:
+        return action[:n_action_steps]
+    return action
+
+
 class LeRobotPI0Policy:
     def __init__(self, model_dir: str | Path, *, tokenizer_name: str | None, device: str):
         model_dir = Path(model_dir).expanduser().resolve()
@@ -86,10 +133,11 @@ class LeRobotPI0Policy:
             raise PolicyProtocolError(f"expected model.safetensors under: {model_dir}")
 
         torch = _torch()
-        PI0Policy, make_pre_post_processors = import_lerobot()
+        self.policy_type = read_policy_type(model_dir)
+        PolicyClass, make_pre_post_processors = import_lerobot(self.policy_type)
         self.model_dir = model_dir
         self.device = torch.device(device)
-        self.policy = PI0Policy.from_pretrained(str(model_dir)).to(self.device).eval()
+        self.policy = PolicyClass.from_pretrained(str(model_dir)).to(self.device).eval()
         overrides: dict[str, Any] = {"device_processor": {"device": str(self.device)}}
         if tokenizer_name is not None:
             overrides["tokenizer_processor"] = {"tokenizer_name": tokenizer_name}
@@ -99,11 +147,13 @@ class LeRobotPI0Policy:
             preprocessor_overrides=overrides,
         )
         self.metadata = {
-            "backend": "lerobot_pi0",
+            "backend": f"lerobot_{self.policy_type}",
+            "policy_type": self.policy_type,
             "model_dir": str(model_dir),
             "device": str(self.device),
             "action_dim": 7,
             "chunk_size": int(getattr(self.policy.config, "chunk_size", 0) or 0) or None,
+            "n_action_steps": int(getattr(self.policy.config, "n_action_steps", 0) or 0) or None,
         }
 
     def infer(self, observation: dict[str, Any]) -> dict[str, Any]:
@@ -116,7 +166,7 @@ class LeRobotPI0Policy:
                 action = self.policy.predict_action_chunk(batch)
                 n_action_steps = int(getattr(self.policy.config, "n_action_steps", 0) or 0)
                 if n_action_steps > 0:
-                    action = action[:, :n_action_steps]
+                    action = _slice_action_steps(action, n_action_steps)
             except Exception as first_error:
                 try:
                     action = self.policy.select_action(batch)
@@ -127,7 +177,8 @@ class LeRobotPI0Policy:
         return {
             "actions": actions,
             "policy_meta": {
-                "backend": "lerobot_pi0",
+                "backend": f"lerobot_{self.policy_type}",
+                "policy_type": self.policy_type,
                 "model_dir": str(self.model_dir),
                 "policy_latency_ms": (time.perf_counter() - started) * 1000,
                 "chunk_size": int(actions.shape[0]),

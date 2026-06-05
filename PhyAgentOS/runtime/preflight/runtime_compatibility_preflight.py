@@ -118,6 +118,7 @@ class RuntimeCompatibilityPreflight:
             validation_mode="strict",
         )
         self._check_adapter_plan(adapter_plan, missing, session.session_id)
+        self._check_adapter_contracts(scheduled, adapter_plan, missing)
         self._check_sensors(scheduled, perception_plan, missing)
         target_tool_manifest = self._target_tool_manifest(skill)
         if contract is not None:
@@ -171,6 +172,144 @@ class RuntimeCompatibilityPreflight:
                 build_action_bridge(bridge)
             except Exception as exc:
                 missing.append(self._missing("ACTION_BRIDGE_MISSING", "adapter_plan.action_bridges", "registered action bridge", str(exc), session_id, "Register the bridge."))
+
+    def _check_adapter_contracts(
+        self,
+        scheduled: ScheduledSession,
+        plan: AdapterPlan,
+        missing: list[MissingItem],
+    ) -> None:
+        if scheduled.skill_spec.runtime_kind != "policy" or not plan.policy_adapter:
+            return
+        try:
+            target_adapter = build_target_adapter(plan.target_adapter)
+            policy_adapter = build_policy_adapter(plan.policy_adapter)
+        except Exception:
+            return
+        if policy_adapter is None:
+            return
+
+        observation_errors = self._observation_contract_errors(
+            target_adapter.output_observation_contract(),
+            policy_adapter.input_observation_contract(),
+        )
+        for error in observation_errors:
+            missing.append(
+                self._missing(
+                    "POLICY_INPUT_CONTRACT_UNSATISFIED",
+                    "adapter_plan.observation_path",
+                    error["expected"],
+                    error["found"],
+                    scheduled.session.session_id,
+                    "Choose compatible target/policy adapters or add an explicit observation bridge.",
+                )
+            )
+
+        action_errors = self._action_contract_errors(
+            policy_adapter.output_action_contract(),
+            target_adapter.input_action_contract(),
+        )
+        for error in action_errors:
+            missing.append(
+                self._missing(
+                    "ACTION_CONTRACT_UNSATISFIED",
+                    "adapter_plan.action_path",
+                    error["expected"],
+                    error["found"],
+                    scheduled.session.session_id,
+                    "Choose compatible policy/target adapters or add an explicit action bridge.",
+                )
+            )
+
+    def _observation_contract_errors(
+        self,
+        target_contract: dict[str, Any],
+        policy_contract: dict[str, Any],
+    ) -> list[dict[str, str | None]]:
+        errors: list[dict[str, str | None]] = []
+        required_sensors = (policy_contract or {}).get("sensors") or {}
+        if not required_sensors:
+            return errors
+        target_sensors = (target_contract or {}).get("sensors") or {}
+        for sensor_id, required in required_sensors.items():
+            actual = target_sensors.get(sensor_id)
+            if actual is None:
+                errors.append({"expected": f"sensor {sensor_id}: {required}", "found": None})
+                continue
+            for field in ("kind", "dtype", "layout"):
+                if field in required and required.get(field) != actual.get(field):
+                    errors.append(
+                        {
+                            "expected": f"sensor {sensor_id}.{field}={required.get(field)}",
+                            "found": str(actual.get(field)),
+                        }
+                    )
+            if "shape" in required and not self._shape_compatible(
+                required.get("shape"),
+                actual.get("shape"),
+                allow_actual_unconstrained=True,
+            ):
+                errors.append(
+                    {
+                        "expected": f"sensor {sensor_id}.shape={required.get('shape')}",
+                        "found": str(actual.get("shape")),
+                    }
+                )
+        return errors
+
+    def _action_contract_errors(
+        self,
+        policy_contract: dict[str, Any],
+        target_contract: dict[str, Any],
+    ) -> list[dict[str, str | None]]:
+        errors: list[dict[str, str | None]] = []
+        produced = (policy_contract or {}).get("actions") or {}
+        required = (target_contract or {}).get("actions") or {}
+        if not produced or not required:
+            return errors
+        if "dtype" in required and produced.get("dtype") != required.get("dtype"):
+            errors.append(
+                {
+                    "expected": f"actions.dtype={required.get('dtype')}",
+                    "found": str(produced.get("dtype")),
+                }
+            )
+        if "shape" in required and not self._shape_compatible(
+            required.get("shape"),
+            produced.get("shape"),
+            allow_actual_unconstrained=False,
+        ):
+            errors.append(
+                {
+                    "expected": f"actions.shape={required.get('shape')}",
+                    "found": str(produced.get("shape")),
+                }
+            )
+        return errors
+
+    def _shape_compatible(self, required: Any, actual: Any, *, allow_actual_unconstrained: bool) -> bool:
+        if required is None:
+            return True
+        if actual is None:
+            return False
+        if not isinstance(required, list) or not isinstance(actual, list):
+            return required == actual
+        if len(required) != len(actual):
+            return False
+        for required_dim, actual_dim in zip(required, actual, strict=True):
+            if required_dim is None:
+                continue
+            if actual_dim is None:
+                if allow_actual_unconstrained:
+                    continue
+                return False
+            if isinstance(required_dim, str) or isinstance(actual_dim, str):
+                if required_dim != actual_dim:
+                    return False
+                continue
+            if int(required_dim) != int(actual_dim):
+                return False
+        return True
 
     def _check_sensors(self, scheduled: ScheduledSession, plan: ResolvedPerceptionPlan | None, missing: list[MissingItem]) -> None:
         required = list(scheduled.skill_spec.requires.sensors)

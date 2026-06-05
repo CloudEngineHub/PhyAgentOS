@@ -270,6 +270,16 @@ class EmbodimentsConfig(Base):
     instances: list[EmbodimentInstanceConfig] = Field(default_factory=list)
 
 
+class RuntimeConfig(Base):
+    """Runtime workspace and watchdog configuration."""
+
+    enabled: bool = True
+    workspace: str | None = None
+    autostart_watchdog: bool = True
+    watchdog_poll_interval_s: float = 1.0
+    target_enabled: dict[str, bool] = Field(default_factory=dict)
+
+
 class ModeConfig(Base):
     """Configuration for agent mode."""
 
@@ -392,6 +402,7 @@ class Config(BaseSettings):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     embodiments: EmbodimentsConfig = Field(default_factory=EmbodimentsConfig)
+    runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
 
     @property
     def is_fleet_mode(self) -> bool:
@@ -404,6 +415,13 @@ class Config(BaseSettings):
         if self.is_fleet_mode:
             return Path(self.embodiments.shared_workspace).expanduser()
         return Path(self.agents.defaults.workspace).expanduser()
+
+    @property
+    def runtime_workspace_path(self) -> Path:
+        """Get expanded runtime workspace path."""
+        if self.runtime.workspace:
+            return Path(self.runtime.workspace).expanduser()
+        return self.workspace_path
 
     def _match_provider(
         self, model: str | None = None
