@@ -13,6 +13,18 @@ from PhyAgentOS.runtime.watchdog.errors import AdapterError
 class OpenPIPi05Adapter(BaseOpenPIAdapter):
     """Map canonical PhyAgentOS observations to pi0.5 OpenPI policy inputs."""
 
+    def input_observation_contract(self) -> dict[str, Any]:
+        return {
+            "sensors": {
+                "front_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+                "wrist_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+                "proprio": {"kind": "vector", "dtype": "float32", "shape": [8]},
+            }
+        }
+
+    def output_action_contract(self) -> dict[str, Any]:
+        return {"actions": {"dtype": "float32", "shape": ["T", 7]}}
+
     def to_policy_input(
         self,
         runtime_observation: dict[str, Any],

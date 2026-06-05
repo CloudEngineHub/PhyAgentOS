@@ -11,6 +11,18 @@ from PhyAgentOS.runtime.watchdog.errors import AdapterError
 
 
 class DummySimTargetAdapter(BaseTargetAdapter):
+    def output_observation_contract(self) -> dict[str, Any]:
+        return {
+            "sensors": {
+                "front_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+                "wrist_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+                "proprio": {"kind": "vector", "dtype": "float32", "shape": [8]},
+            }
+        }
+
+    def input_action_contract(self) -> dict[str, Any]:
+        return {"actions": {"dtype": "float32", "shape": ["T", 7]}}
+
     def to_runtime_observation(self, raw_obs: dict[str, Any], target_info: dict[str, Any]) -> dict[str, Any]:
         sensors = {
             "front_rgb": {

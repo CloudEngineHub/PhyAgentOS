@@ -13,6 +13,12 @@ from PhyAgentOS.runtime.watchdog.errors import AdapterError
 class LiberoTargetAdapter(BaseTargetAdapter):
     """Convert LIBERO raw observations to PhyAgentOS runtime observations."""
 
+    def output_observation_contract(self) -> dict[str, Any]:
+        return _libero_observation_contract()
+
+    def input_action_contract(self) -> dict[str, Any]:
+        return _libero_action_contract()
+
     def to_runtime_observation(self, raw_obs: dict[str, Any], target_info: dict[str, Any]) -> dict[str, Any]:
         try:
             front_rgb = raw_obs["agentview_image"]
@@ -112,6 +118,20 @@ def _image_array(image: Any, name: str) -> np.ndarray:
     if np.issubdtype(array.dtype, np.floating):
         array = (np.clip(array, 0.0, 1.0) * 255.0).astype(np.uint8)
     return np.ascontiguousarray(array.astype(np.uint8, copy=False))
+
+
+def _libero_observation_contract() -> dict[str, Any]:
+    return {
+        "sensors": {
+            "front_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+            "wrist_rgb": {"kind": "image", "dtype": "uint8", "layout": "HWC"},
+            "proprio": {"kind": "vector", "dtype": "float32", "shape": [8]},
+        }
+    }
+
+
+def _libero_action_contract() -> dict[str, Any]:
+    return {"actions": {"dtype": "float32", "shape": ["T", 7]}}
 
 
 def _quat_to_axisangle(quat: np.ndarray) -> np.ndarray:

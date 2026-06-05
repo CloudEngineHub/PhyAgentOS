@@ -76,7 +76,7 @@ Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to exec
 <tr>
   <td>🧩</td>
   <td><b>Adapter + Bridge</b></td>
-  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> three-way decoupling; <code>AdapterPlan</code> auto-composed, eliminating target×skill combinatorial explosion</td>
+  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> three-way decoupling with explicit observation/action contracts; <code>AdapterPlan</code> auto-composed, eliminating target×skill combinatorial explosion</td>
 </tr>
 <tr>
   <td>⚡</td>
@@ -86,7 +86,7 @@ Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to exec
 <tr>
   <td>🛡️</td>
   <td><b>Strict Preflight</b></td>
-  <td>10 validation checks (target / sensor / perception / contract / tool); failures are <code>rejected</code> before execution starts</td>
+  <td>Runtime validation checks (target / sensor / perception / adapter contract / action contract / tool); failures are <code>rejected</code> before execution starts</td>
 </tr>
 <tr>
   <td>📝</td>
@@ -152,7 +152,7 @@ paos agent
 **Optional: Connect Runtime Services**
 
 ```bash
-# Real LIBERO target machine
+# LIBERO benchmark TargetWS machine
 MUJOCO_GL=egl PYTHONWARNINGS=ignore \
 conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
   --host 0.0.0.0 --port 9002
@@ -186,7 +186,7 @@ PhyAgentOS/
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
-│   │   └── remote/libero/     #   Real LIBERO TargetWS server + proxy
+│   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
 │   │   ├── libero/            #   LIBERO target adapter
