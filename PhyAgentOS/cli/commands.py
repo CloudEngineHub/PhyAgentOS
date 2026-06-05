@@ -945,5 +945,98 @@ def _login_github_copilot() -> None:
         raise typer.Exit(1)
 
 
+
+# ============================================================================
+# Minecraft Commands
+# ============================================================================
+
+
+minecraft_app = typer.Typer(help="Minecraft game agent demo")
+app.add_typer(minecraft_app, name="minecraft")
+
+
+@minecraft_app.command("say")
+def minecraft_say(
+    instruction: str = typer.Argument(help="自然语言指令，如 '挖5个橡木'"),
+    bridge_url: str = typer.Option(
+        "https://carucated-kattie-cryptogamic.ngrok-free.dev",
+        "--url", "-u", help="Bridge HTTP API URL",
+    ),
+):
+    """用自然语言控制 Minecraft bot"""
+    import time, os, json
+
+    config = _load_runtime_config()
+    provider = _make_provider(config)
+
+    system_prompt = (
+        "你控制一个 Minecraft 机器人。将用户的请求转为 JSON action 列表。\n"
+        "可用动作: move/look/dig/place/collect/craft/chat/jump/sneak/sprint/"
+        "attack/interact/use/select_slot/drop/equip.\n"
+        "move 参数: {dx, dy, dz, absolute: true/false}\n"
+        "chat 参数: {message}\n"
+        "look 参数: {yaw, pitch}\n"
+        "collect 参数: {block_type, count}\n"
+        "dig 参数: {x, y, z}\n"
+        "place 参数: {x, y, z, face}\n"
+        "只返回 JSON 数组，不要其他文字。示例:\n"
+        '[{\"type\":\"chat\",\"params\":{\"message\":\"收到\"}},'
+        '{\"type\":\"collect\",\"params\":{\"block_type\":\"oak_log\",\"count\":5}},'
+        '{\"type\":\"chat\",\"params\":{\"message\":\"完成\"}}]'
+    )
+
+    console.print("[dim]Paos 思考中...[/dim]")
+    import asyncio
+
+    async def _ask():
+        resp = await provider.chat_with_retry(messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": instruction},
+        ])
+        return resp.content.strip()
+
+    raw = asyncio.run(_ask())
+
+    try:
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        plan = json.loads(raw)
+        if not isinstance(plan, list):
+            raise ValueError("not a list")
+    except Exception:
+        console.print(f"[red]LLM 返回格式错误: {raw[:200]}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]-> 生成 {len(plan)} 步动作[/dim]")
+    for i, a in enumerate(plan):
+        console.print(f"  {i+1}. {a['type']}: {a.get('params', {})}")
+
+    from PhyAgentOS.runtime.schemas import SessionSpec, AdapterPlan
+    from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
+    from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
+    from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
+
+    target = MinecraftTarget({"bridge_url": bridge_url, "verify_ssl": False})
+    session = SessionSpec(
+        session_id=f"sess_cli_{os.urandom(3).hex()}",
+        target_ref="target://minecraft_java_env",
+        skill_ref="skill://minecraft_navigate",
+        task_description=instruction,
+        execution={"max_steps": len(plan) + 3},
+        runtime_hints={"perception_queries": plan},
+    )
+
+    console.print()
+    result = MinecraftSkillRuntime().run(
+        session, target, MinecraftTargetAdapter(),
+        None, [], None,
+        AdapterPlan(target_adapter="target_adapter://minecraft_adapter"),
+    )
+    console.print(f"\n[green]完成: {result.num_steps} 步, status={result.status}[/green]")
+
+
 if __name__ == "__main__":
     app()
+

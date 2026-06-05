@@ -104,4 +104,10 @@ skills:
       forbidden:
         - implicit_shape_truncation
         - implicit_representation_cast
+  - id: minecraft_navigate
+    category: builtin
+    runtime: MinecraftSkillRuntime
+    supported_targets: [minecraft_java_env]
+    requires:
+      environment_outputs: [player_position, nearby_blocks]
 ```

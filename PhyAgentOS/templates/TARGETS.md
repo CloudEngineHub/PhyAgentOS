@@ -35,4 +35,19 @@ targets:
         action_dim: 7
         chunk_size: 4
         max_chunk_size: 50
+    targets:
+  - id: minecraft_java_env
+    type: sim
+    workspace: workspaces/minecraft
+    enabled: true
+    supported_skills: [minecraft_navigate, minecraft_mine, minecraft_build]
+    runtime:
+      target_runtime: MinecraftTargetRuntime
+      target_endpoint: targetws://local/minecraft_java_env
+      target_adapter: target_adapter://minecraft_adapter
+    perception:
+      enabled: false
+    config:
+      bridge_url: "https://abc123.ap.ngrok-free.app"   # ← ngrok 公网地址
+      step_delay: 0.1
 ```
