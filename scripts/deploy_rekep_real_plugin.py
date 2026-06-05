@@ -10,7 +10,7 @@ To deploy a ReKep-enabled real-robot target:
 2. Create a FrankaTargetAdapter (or equivalent) in PhyAgentOS/runtime/adapters/
 3. Create a ReKepBuiltinSkillRuntime in PhyAgentOS/runtime/skills/builtin/
 4. Configure sensor/perception YAML in configs/runtime/
-5. Run: python -m PhyAgentOS.runtime.watchdog
+5. Start paos agent or paos gateway; the runtime watchdog starts with the Agent process.
 
 See docs/user_development_guide/ for detailed instructions.
 """

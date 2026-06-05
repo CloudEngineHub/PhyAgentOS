@@ -82,6 +82,7 @@ Important rules:
 - `runtime.runtime_contract_ref` is the target action/safety contract used by compatibility preflight.
 - Relative config paths are resolved relative to the runtime workspace.
 - Adapter identifiers must use explicit URI namespaces such as `target_adapter://franka_real_adapter`.
+- Remote target endpoints use the runtime RPC envelope over `targetws://`; responses are matched to requests by message type, sequence number, session id, target id, and skill id.
 
 ### SKILLS.md
 
@@ -132,7 +133,7 @@ Behavior:
 
 - `requires.sensors: []` and `requires.environment_outputs: []` means perception is not used.
 - If `requires.sensors` is non-empty but `environment_outputs` is empty, preflight validates sensor config and observation schema declarations, but does not write `ENVIRONMENT.md`.
-- If `environment_outputs` is non-empty, preflight validates sensor/perception config and selects a pipeline that declares full coverage for those outputs. After the session enters `running`, runtime reads a target observation, checks required channels against the declared schema, runs the plugin pipeline, verifies that the actual `EnvironmentDelta.generated_outputs` covers every requested output, and only then writes `ENVIRONMENT.md`.
+- If `environment_outputs` is non-empty, preflight validates sensor/perception config and selects a pipeline that declares full coverage for those outputs. After the session enters `running`, the skill runtime requests an environment refresh through `TargetSessionHandle`; runtime reads a target observation through the handle, checks required channels against the declared schema, runs the plugin pipeline, verifies that the actual `EnvironmentDelta.generated_outputs` covers every requested output, and only then writes `ENVIRONMENT.md`.
 
 ### SESSIONS.md
 
@@ -522,6 +523,13 @@ If a target observation is missing a required channel, has a mismatched dtype/sh
 - The failure happens after the session has entered `running`.
 - The skill runtime fails through `TargetSessionHandle` before committing a partial environment update.
 - No partial perception objects are written to `ENVIRONMENT.md`.
+
+If the session exceeds `execute_timeout_s` while perception or skill execution is running:
+
+- Session is marked `timed_out`.
+- Runtime writes the session result and episode artifact for audit.
+- No partial perception objects are written to `ENVIRONMENT.md`.
+- Target cleanup is best-effort under the current thread-supervised runtime.
 
 Common rejection causes:
 

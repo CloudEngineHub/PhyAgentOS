@@ -24,6 +24,7 @@ class ContextBuilder:
     EMBODIED_FILES = [
         "EMBODIED.md", "ENVIRONMENT.md", "LESSONS.md", "ROBOTS.md",
         "TASK.md", "ORCHESTRATOR.md",
+        "RUNTIME.md",
         "MEMORY_SPATIAL.md", "TIMELINE.md",
     ]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"

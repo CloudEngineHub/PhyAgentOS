@@ -138,10 +138,10 @@ paos onboard
 <td align="center">3</td>
 <td>
 
-**Terminal 1: Start Runtime (Track B)**
+**Start Agent**
 
 ```bash
-python -m PhyAgentOS.runtime.watchdog
+paos agent
 ```
 </td>
 </tr>
@@ -149,21 +149,28 @@ python -m PhyAgentOS.runtime.watchdog
 <td align="center">4</td>
 <td>
 
-**Terminal 2: Start Agent (Track A)**
+**Optional: Connect Runtime Services**
 
 ```bash
-paos agent
+# Real LIBERO target machine
+MUJOCO_GL=egl PYTHONWARNINGS=ignore \
+conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
+  --host 0.0.0.0 --port 9002
+
+# pi0.5 policy machine
+conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_server \
+  --model-dir /path/to/pi05/checkpoint --host 0.0.0.0 --port 8000
 ```
 </td>
 </tr>
 </table>
 
-Enter natural language commands in the Agent CLI to drive hardware. No hardware? Run the Smoke Test to verify the full pipeline:
+`paos agent` and `paos gateway` create the runtime workspace and start the
+session watchdog automatically. Runtime targets are declared in `TARGETS.md`;
+the Agent queues work by appending sessions to `SESSIONS.md`.
 
 ```bash
-python scripts/init_runtime_workspace.py --workspace /tmp/paos_runtime_smoke
-python scripts/run_runtime_watchdog.py --workspace /tmp/paos_runtime_smoke --once
-# → session marked succeeded, results written to artifacts/
+paos agent -m "run the configured LIBERO benchmark task"
 ```
 
 ---
@@ -179,8 +186,12 @@ PhyAgentOS/
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   │   └── remote/libero/     #   Real LIBERO TargetWS server + proxy
 │   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
+│   │   ├── libero/            #   LIBERO target adapter
+│   │   └── openpi/            #   OpenPI policy adapters
+│   ├── policy/openpi/         #   OpenPI client + LeRobot pi0-family server
 │   ├── perception/            #   Perception Runtime / EnvironmentWriter
 │   ├── preflight/             #   RuntimeCompatibilityPreflight
 │   └── schemas/               #   Pydantic Schema
