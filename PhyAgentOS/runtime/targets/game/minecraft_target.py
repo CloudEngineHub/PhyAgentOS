@@ -134,7 +134,7 @@ class MinecraftTarget(BaseLocalTarget):
         return {
             "image": np.zeros((224, 224, 3), dtype=np.uint8),
             "state": state,
-            "nearby_blocks": data.get("nearby_blocks", {}).get("blocks", []),
+            "nearby_blocks": data.get("nearby_blocks", []),
             "nearby_entities": data.get("nearby_entities", []),
             "players": data.get("players", []),
             "inventory": data.get("inventory", {}),
