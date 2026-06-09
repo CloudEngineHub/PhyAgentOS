@@ -136,6 +136,7 @@ class MinecraftTarget(BaseLocalTarget):
             "state": state,
             "nearby_blocks": data.get("nearby_blocks", {}).get("blocks", []),
             "nearby_entities": data.get("nearby_entities", []),
+            "players": data.get("players", []),
             "inventory": data.get("inventory", {}),
             "info": {
                 "position": {"x": float(self._position[0]), "y": float(self._position[1]), "z": float(self._position[2])},
@@ -221,6 +222,57 @@ class MinecraftTarget(BaseLocalTarget):
 
     def describe(self) -> dict[str, Any]:
         return {"type": "minecraft_java_bot", "actions": sorted(VALID_ACTION_TYPES)}
+
+    def get_environment_state(self) -> dict[str, Any]:
+        obs = self.observe()
+        info = obs.get("info", {})
+        pos = info.get("position", {})
+        nearby_entities = obs.get("nearby_entities", [])
+        nearby_blocks = obs.get("nearby_blocks", [])
+        players = obs.get("players", [])
+
+        blocks_summary_parts: list[str] = []
+        for b in nearby_blocks:
+            bp = b.get("position", {})
+            blocks_summary_parts.append(
+                f"{b.get('name', 'unknown')} at ({bp.get('x', 0):.0f}, {bp.get('y', 0):.0f}, {bp.get('z', 0):.0f})"
+            )
+
+        entity_parts: list[str] = []
+        for e in nearby_entities:
+            ep = e.get("position", {})
+            entity_parts.append(
+                f"{e.get('type', 'unknown')} at ({ep.get('x', 0):.1f}, {ep.get('y', 0):.1f}, {ep.get('z', 0):.1f})"
+            )
+
+        return {
+            "status": "connected",
+            "position": {
+                "x": round(float(pos.get("x", 0)), 1),
+                "y": round(float(pos.get("y", 0)), 1),
+                "z": round(float(pos.get("z", 0)), 1),
+            },
+            "health": float(info.get("health", 20.0)),
+            "hunger": int(info.get("hunger", 20)),
+            "dimension": str(info.get("dimension", "overworld")),
+            "on_ground": bool(info.get("on_ground", True)),
+            "players": [
+                {
+                    "username": str(p.get("username", "")),
+                    "position": {
+                        "x": round(float(p.get("position", {}).get("x", 0)), 1),
+                        "y": round(float(p.get("position", {}).get("y", 0)), 1),
+                        "z": round(float(p.get("position", {}).get("z", 0)), 1),
+                    },
+                }
+                for p in players
+                if isinstance(p, dict) and p.get("username")
+            ],
+            "nearby": {
+                "blocks_summary": "; ".join(blocks_summary_parts[:20]),
+                "entities": entity_parts[:20],
+            },
+        }
 
     def configure_session(self, session_ctx: dict[str, Any]) -> dict[str, Any]:
         return {"configured": True, "session_id": session_ctx.get("session_id")}

@@ -223,6 +223,7 @@ WatchdogSupervisor does not need to know whether the Target is a game, simulatio
 - Perception pipeline (GeometryPipeline + SegmentationPipeline + FusionPipeline)
 - Semantic navigation (SemanticNavigationTool, semantic goal → physical coordinates)
 - External plugin dynamic loading mechanism
+- Minecraft Game Target (mineflayer HTTP bridge remote control, zero protocol dependencies)
 
 ---
 
@@ -281,6 +282,7 @@ Phase 2: Deep Evolution
    - Cross-season long-term memory validation
    - NPC relationship network social memory training
    - 14-day autonomous run acceptance test
+   - Achieved: Minecraft Game Target as first game-type Target, validates HTTP bridge remote control pattern (see [User Manual §2.6.7](../02-user-manual.md#267-minecraft-game-agent))
 
 2. **Base Runtime Completion**
    - Session state machine: pending → claimed → running → succeeded / failed / timed_out

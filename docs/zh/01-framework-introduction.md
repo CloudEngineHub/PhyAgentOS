@@ -223,6 +223,7 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 - 感知管线（GeometryPipeline + SegmentationPipeline + FusionPipeline）
 - 语义导航（SemanticNavigationTool，语义目标 → 物理坐标）
 - 外部插件动态加载机制
+- Minecraft Game Target（mineflayer HTTP bridge 远程操控，无协议依赖）
 
 ---
 
@@ -281,6 +282,7 @@ Phase 2: 深度演进
    - 跨 season 长期记忆验证
    - NPC 关系网络的社交记忆训练
    - 14 天无人干预运行验收
+   - 已达成：Minecraft Game Target 作为首个 game 类型 Target，验证了 HTTP bridge 远程操控模式（详见 [用户手册 §2.6.7](../02-user-manual.md#267-minecraft-game-agent)）
 
 2. **Base Runtime 完型**
    - Session 状态机健全：pending → claimed → running → succeeded / failed / timed_out

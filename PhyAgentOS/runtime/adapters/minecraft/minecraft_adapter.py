@@ -45,7 +45,7 @@ class MinecraftTargetAdapter(BaseTargetAdapter):
             "sensors": sensors,
             "target_info": target_info,
         }
-        for key in ("nearby_blocks", "nearby_entities", "inventory", "info"):
+        for key in ("nearby_blocks", "nearby_entities", "players", "bot", "inventory", "info"):
             value = raw_obs.get(key)
             if value is not None:
                 runtime_obs[key] = value

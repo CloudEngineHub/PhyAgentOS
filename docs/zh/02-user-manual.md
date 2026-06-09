@@ -18,9 +18,10 @@
   - [2.6.4 远程底盘（XLeRobot）](#264-远程底盘xlerobot)
   - [2.6.5 ReKep 真机插件](#265-rekep-真机插件)
   - [2.6.6 Fleet 多机器人协同](#266-fleet-多机器人协同)
+  - [2.6.7 Minecraft Game Agent](#267-minecraft-game-agent)
 - [2.7 运行时文件说明](#27-运行时文件说明)
 - [2.8 常见交互示例](#28-常见交互示例)
-- [2.10 常见问题排查](#210-常见问题排查)
+- [2.9 常见问题排查](#29-常见问题排查)
 
 ---
 
@@ -390,6 +391,59 @@ paos agent
 
 ---
 
+### 2.6.7 Minecraft Game Agent
+
+PhyAgentOS 通过 HTTP bridge 远程操控本地 Minecraft Java 版（1.20.4），实现云端 Agent 控制游戏 bot。完整的部署指南、使用手册、配置示例与踩坑记录存放在独立的 scenario 文档中。
+
+#### 三层文档索引
+
+| 阅读路径 | 文档 | 内容 |
+|---------|------|------|
+| 了解架构 | [scenario 总览](https://github.com/PhyAgentOS/PhyAgentOS/tree/main/docs/scenarios/game/minecraft) | 文件结构、bridge_server.js 源码 |
+| 快速跑通 | [部署指南](../../scenarios/game/minecraft/zh/deployment.md) | 从零部署：Windows ngrok + bridge → Linux 连接 |
+| 日常使用 | [使用指南](../../scenarios/game/minecraft/zh/usage.md) | CLI 控制、对话监听、bot 传送、脚本速查 |
+
+#### 最简启动
+
+**Windows 端**（详见[部署指南](../../scenarios/game/minecraft/zh/deployment.md)）：
+```powershell
+cd E:\mc_bridge
+$env:MC_HOST="localhost"; $env:MC_PORT="25565"; $env:BOT_NAME="paos"
+$env:MC_VERSION="1.20.4"; $env:API_PORT="3001"
+node bridge_server.js
+# 另开终端: ngrok http 3001 --region=ap
+```
+
+**Linux 云端**：
+```python
+from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
+t = MinecraftTarget({"bridge_url": "https://xxx.ngrok-free.app"})
+t.build(); t.reset({})
+t.step({"type": "chat", "params": {"message": "Hello"}})
+t.close()
+```
+
+或直接 CLI：
+```bash
+paos minecraft say "挖5个橡木然后过来"
+```
+
+#### 完整内容位置
+
+| 内容 | 位置 |
+|------|------|
+| Windows 9 步部署流程 | [deployment.md](../../scenarios/game/minecraft/zh/deployment.md) |
+| 观察空间 schema | [deployment.md §3.3](../../scenarios/game/minecraft/zh/deployment.md#33-观察空间) |
+| 16 种动作空间 | [deployment.md §4](../../scenarios/game/minecraft/zh/deployment.md#四动作空间16-种) |
+| TARGETS.md / SKILLS.md 配置 | [deployment.md §5-6](../../scenarios/game/minecraft/zh/deployment.md#五配置-targetsmd) |
+| Agent → SESSIONS.md 全链路 | [deployment.md §7](../../scenarios/game/minecraft/zh/deployment.md#七完整-pipelineagent-下发任务) |
+| CLI 与对话控制 | [usage.md](../../scenarios/game/minecraft/zh/usage.md) |
+| bot 传送 | [usage.md §3](../../scenarios/game/minecraft/zh/usage.md#三bot-传送) |
+| 9 条踩坑记录 | [usage.md §5](../../scenarios/game/minecraft/zh/usage.md#五踩坑记录) |
+| 代码变更速查 | [usage.md §6](../../scenarios/game/minecraft/zh/usage.md#六代码变更速查) |
+
+---
+
 ## 2.7 运行时文件说明
 
 | 文件 | 位置 | 作用 |
@@ -446,6 +500,20 @@ paos agent
 paos agent -m "open simulation"
 paos agent -m "go to desk"
 paos agent -m "pick up the red cube and return to the starting position"
+```
+
+### Minecraft 自然语言控制
+
+```bash
+paos minecraft say "挖5个橡木然后过来"
+```
+
+LLM 自动将自然语言转为 Minecraft 动作序列执行。
+
+也可以在游戏聊天中对 bot 下达指令：
+```bash
+python test/chat_listener.py
+# 在游戏里说: paos 挖5个橡木
 ```
 
 ### VLA 模型抓取
@@ -517,6 +585,32 @@ paos agent -m "deploy a VLA to pick up the red cube"
 2. 检查 `pipergo2_manipulation_driver.json` 中 `isaac_env` 块的路径配置
 3. `--vnc` 模式下查看首次启动的 re-exec 日志
 4. 确认 `LD_LIBRARY_PATH` 已正确设置（VNC 模式会自动处理）
+
+### Minecraft bridge 连接失败（SSL 错误）
+
+**现象**：`SSL: CERTIFICATE_VERIFY_FAILED`。
+
+**排查**：
+1. ngrok 免费版证书不完整，在 TARGETS.md 配置中添加 `"verify_ssl": false`
+2. 若仍报错，检查 bridge_url 前后是否有多余空格
+
+### Minecraft API 返回空或 HTML
+
+**现象**：`JSONDecodeError: Expecting value` 或返回 HTML 确认页。
+
+**排查**：
+1. ngrok 免费版会先显示确认页，确认已在 `minecraft_target.py` 中添加 `ngrok-skip-browser-warning: true` header
+2. 检查 ngrok 隧道是否仍在运行
+3. 确认 bridge URL 包含 `https://` 前缀
+
+### Minecraft bot 传送不生效
+
+**现象**：bot 在出生点，无法移动到玩家身边。
+
+**排查**：
+1. 确认世界开启了作弊（Esc → 对局域网开放 → 允许作弊: 开）
+2. 玩家需在 bot 的 render distance 范围内
+3. 可手动使用 `test/tp_bot.py` 传送 bot 到你的坐标
 
 ---
 

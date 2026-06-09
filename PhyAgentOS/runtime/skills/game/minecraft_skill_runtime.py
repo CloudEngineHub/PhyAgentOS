@@ -73,6 +73,15 @@ class MinecraftSkillRuntime(BaseSkillRuntime):
             }
             runtime_obs = target_adapter.to_runtime_observation(raw_obs, target_info)
 
+            # ── action plan exhausted → done ───────────────────
+            if step_idx >= len(action_plan):
+                return SessionResult(
+                    status="succeeded",
+                    success=True,
+                    num_steps=num_steps,
+                    return_value=total_reward,
+                )
+
             action = _pick_action(action_plan, step_idx, runtime_obs)
 
             bridged_action = action
@@ -82,6 +91,7 @@ class MinecraftSkillRuntime(BaseSkillRuntime):
             transition = target.step(bridged_action)
             num_steps += 1
             raw_obs = transition.get("obs", target.observe())
+
             total_reward += float(transition.get("reward", 0.0))
 
             if bool(transition.get("done", False)) or bool(
@@ -121,6 +131,4 @@ def _pick_action(
     step_idx: int,
     runtime_obs: dict[str, Any],
 ) -> dict[str, Any]:
-    if action_plan and step_idx < len(action_plan):
-        return action_plan[step_idx]
-    return {"type": "look", "params": {"yaw": step_idx * 15.0 % 360, "pitch": 0.0}}
+    return action_plan[step_idx].copy()

@@ -198,6 +198,7 @@ def onboard():
     from PhyAgentOS.embodiment_registry import EmbodimentRegistry
 
     registry = EmbodimentRegistry(config)
+    workspace = get_workspace_path()
     if registry.is_fleet:
         shared_workspace = registry.resolve_agent_workspace()
         if not shared_workspace.exists():
@@ -207,12 +208,14 @@ def onboard():
         for instance in registry.instances(enabled_only=True):
             if instance.workspace.exists():
                 console.print(f"[green]✓[/green] Ready robot workspace {instance.robot_id} at {instance.workspace}")
+        workspace = shared_workspace
     else:
-        workspace = get_workspace_path()
         if not workspace.exists():
             workspace.mkdir(parents=True, exist_ok=True)
             console.print(f"[green]✓[/green] Created workspace at {workspace}")
         sync_workspace_templates(workspace, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
+
+    _setup_minecraft_workspace_from_targets(workspace)
 
     console.print(f"\n{__logo__} PhyAgentOS is ready!")
     console.print("\nNext steps:")
@@ -530,8 +533,64 @@ def gateway(
 
 
 # ============================================================================
-# Agent Commands
+# Commands
 # ============================================================================
+
+TARGET_MC_PATTERN = "minecraft_java_env"
+
+
+def _setup_minecraft_workspace_from_targets(workspace: Path) -> None:
+    """If TARGETS.md contains a minecraft target, set up its workspace with
+    the minecraft-specific EMBODIED.md and ACTION.md."""
+    targets_file = workspace / "TARGETS.md"
+    if not targets_file.exists():
+        return
+
+    targets_content = targets_file.read_text(encoding="utf-8")
+    if TARGET_MC_PATTERN not in targets_content:
+        return
+
+    try:
+        import yaml
+        targets_data = yaml.safe_load(targets_content)
+    except Exception:
+        return
+
+    if not isinstance(targets_data, dict):
+        return
+
+    target_list = targets_data.get("targets", [])
+    if not isinstance(target_list, list):
+        return
+
+    for target in target_list:
+        if not isinstance(target, dict):
+            continue
+        if target.get("id") != TARGET_MC_PATTERN:
+            continue
+        target_workspace_rel = target.get("workspace", "workspaces/minecraft")
+        target_workspace = workspace / target_workspace_rel
+        target_workspace.mkdir(parents=True, exist_ok=True)
+
+        # ── copy minecraft EMBODIED.md ──
+        from importlib.resources import files as pkg_files
+        try:
+            tpl_dir = pkg_files("PhyAgentOS") / "templates"
+            mc_embodied_src = tpl_dir / "minecraft_embodied.md"
+            embodied_dst = target_workspace / "EMBODIED.md"
+            if mc_embodied_src.exists() and not embodied_dst.exists():
+                embodied_dst.write_text(mc_embodied_src.read_text(encoding="utf-8"), encoding="utf-8")
+                console.print(f"[green]✓[/green] Created EMBODIED.md for {TARGET_MC_PATTERN} at {embodied_dst}")
+        except Exception:
+            pass
+
+        # ── ensure ACTION.md exists ──
+        action_file = target_workspace / "ACTION.md"
+        if not action_file.exists():
+            from PhyAgentOS.utils.action_queue import dump_action_document, empty_action_document
+            action_file.write_text(dump_action_document(empty_action_document()), encoding="utf-8")
+            console.print(f"[green]✓[/green] Created ACTION.md for {TARGET_MC_PATTERN} at {action_file}")
+        break
 
 
 @app.command()
@@ -994,7 +1053,7 @@ def minecraft_say(
     ),
 ):
     """用自然语言控制 Minecraft bot"""
-    import time, os, json
+    import json
 
     config = _load_runtime_config()
     provider = _make_provider(config)
@@ -1003,7 +1062,7 @@ def minecraft_say(
         "你控制一个 Minecraft 机器人。将用户的请求转为 JSON action 列表。\n"
         "可用动作: move/look/dig/place/collect/craft/chat/jump/sneak/sprint/"
         "attack/interact/use/select_slot/drop/equip.\n"
-        "move 参数: {dx, dy, dz, absolute: true/false}\n"
+        "move 参数: {dx, dy, dz, absolute: true/false} 或 {target: \"player\"/\"pig\"/...} 追踪实体\n"
         "chat 参数: {message}\n"
         "look 参数: {yaw, pitch}\n"
         "collect 参数: {block_type, count}\n"
@@ -1012,7 +1071,11 @@ def minecraft_say(
         "只返回 JSON 数组，不要其他文字。示例:\n"
         '[{\"type\":\"chat\",\"params\":{\"message\":\"收到\"}},'
         '{\"type\":\"collect\",\"params\":{\"block_type\":\"oak_log\",\"count\":5}},'
-        '{\"type\":\"chat\",\"params\":{\"message\":\"完成\"}}]'
+        '{\"type\":\"chat\",\"params\":{\"message\":\"完成\"}}]\n'
+        "追踪玩家: [{\"type\":\"move\",\"params\":{\"target\":\"player\"}},"
+        '{\"type\":\"chat\",\"params\":{\"message\":\"我来了\"}}]\n'
+        "追踪实体: [{\"type\":\"move\",\"params\":{\"target\":\"pig\"}},"
+        '{\"type\":\"chat\",\"params\":{\"message\":\"找到猪了\"}}]'
     )
 
     console.print("[dim]Paos 思考中...[/dim]")
@@ -1043,28 +1106,29 @@ def minecraft_say(
     for i, a in enumerate(plan):
         console.print(f"  {i+1}. {a['type']}: {a.get('params', {})}")
 
-    from PhyAgentOS.runtime.schemas import SessionSpec, AdapterPlan
-    from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
-    from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
-    from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
+    from PhyAgentOS.utils.action_queue import append_action, dump_action_document, empty_action_document
 
-    target = MinecraftTarget({"bridge_url": bridge_url, "verify_ssl": False})
-    session = SessionSpec(
-        session_id=f"sess_cli_{os.urandom(3).hex()}",
-        target_ref="target://minecraft_java_env",
-        skill_ref="skill://minecraft_navigate",
-        task_description=instruction,
-        execution={"max_steps": len(plan) + 3},
-        runtime_hints={"perception_queries": plan},
-    )
+    workspace = get_workspace_path()
+    mc_workspace = workspace / "workspaces" / "minecraft"
+    mc_workspace.mkdir(parents=True, exist_ok=True)
+    action_file = mc_workspace / "ACTION.md"
 
-    console.print()
-    result = MinecraftSkillRuntime().run(
-        session, target, MinecraftTargetAdapter(),
-        None, [], None,
-        AdapterPlan(target_adapter="target_adapter://minecraft_adapter"),
-    )
-    console.print(f"\n[green]完成: {result.num_steps} 步, status={result.status}[/green]")
+    document = empty_action_document()
+    for step in plan:
+        action_type = step.get("type", "")
+        parameters = step.get("params", {})
+        if action_type:
+            document = append_action(document, action_type=action_type, parameters=parameters)
+
+    action_file.write_text(dump_action_document(document), encoding="utf-8")
+    console.print(f"\n[dim]已写入 {len(plan)} 步动作到 {action_file}[/dim]")
+    console.print("[dim]启动 watchdog 执行:[/dim]")
+    console.print("  [cyan]python -c \"from pathlib import Path; from PhyAgentOS.runtime.watchdog.minecraft_action_runner import MinecraftActionRunner;")
+    console.print(f"  r = MinecraftActionRunner(Path('{mc_workspace}'), {{'bridge_url': '{bridge_url}', 'verify_ssl': False}});")
+    console.print("  r._ensure_target(); r.run_once(); r.stop()\"[/cyan]")
+    console.print("\n[dim]或持续轮询:[/dim]")
+    console.print("  [cyan]python -c \"from pathlib import Path; from PhyAgentOS.runtime.watchdog.minecraft_action_runner import MinecraftActionRunner;")
+    console.print(f"  MinecraftActionRunner(Path('{mc_workspace}'), {{'bridge_url': '{bridge_url}', 'verify_ssl': False}}).run_forever()\"[/cyan]")
 
 
 if __name__ == "__main__":

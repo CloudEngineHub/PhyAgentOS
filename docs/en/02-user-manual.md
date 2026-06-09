@@ -18,6 +18,7 @@
   - [2.6.4 Remote Chassis (XLeRobot)](#264-remote-chassis-xlerobot)
   - [2.6.5 ReKep Real-Robot Plugin](#265-rekep-real-robot-plugin)
   - [2.6.6 Fleet Multi-Robot Coordination](#266-fleet-multi-robot-coordination)
+  - [2.6.7 Minecraft Game Agent](#267-minecraft-game-agent)
 - [2.7 Runtime File Reference](#27-runtime-file-reference)
 - [2.8 Common Interaction Examples](#28-common-interaction-examples)
 - [2.9 Troubleshooting](#29-troubleshooting)
@@ -395,6 +396,59 @@ paos agent
 
 ---
 
+### 2.6.7 Minecraft Game Agent
+
+PhyAgentOS remotely controls a local Minecraft Java Edition (1.20.4) via an HTTP bridge, enabling cloud-based Agent control of an in-game bot. Full deployment guides, usage manuals, configuration examples, and troubleshooting are maintained in dedicated scenario documents.
+
+#### Three-Layer Document Index
+
+| Reading Path | Document | Content |
+|-------------|----------|---------|
+| Understand architecture | [scenario overview](https://github.com/PhyAgentOS/PhyAgentOS/tree/main/docs/scenarios/game/minecraft) | File structure, bridge_server.js source |
+| Get running quickly | [Deployment Guide](../../scenarios/game/minecraft/en/deployment.md) | Zero-to-deploy: Windows ngrok + bridge → Linux connection |
+| Daily usage | [Usage Guide](../../scenarios/game/minecraft/en/usage.md) | CLI control, chat listener, bot teleport, script reference |
+
+#### Quick Start
+
+**Windows side** (see [Deployment Guide](../../scenarios/game/minecraft/en/deployment.md)):
+```powershell
+cd E:\mc_bridge
+$env:MC_HOST="localhost"; $env:MC_PORT="25565"; $env:BOT_NAME="paos"
+$env:MC_VERSION="1.20.4"; $env:API_PORT="3001"
+node bridge_server.js
+# Another terminal: ngrok http 3001 --region=ap
+```
+
+**Linux cloud**:
+```python
+from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
+t = MinecraftTarget({"bridge_url": "https://xxx.ngrok-free.app"})
+t.build(); t.reset({})
+t.step({"type": "chat", "params": {"message": "Hello"}})
+t.close()
+```
+
+Or via CLI:
+```bash
+paos minecraft say "mine 5 oak logs and come over"
+```
+
+#### Full Content Location
+
+| Content | Location |
+|---------|----------|
+| Windows 9-step deployment | [deployment.md](../../scenarios/game/minecraft/en/deployment.md) |
+| Observation space schema | [deployment.md §3.3](../../scenarios/game/minecraft/en/deployment.md#33-observation-space) |
+| 16 action types | [deployment.md §4](../../scenarios/game/minecraft/en/deployment.md#4-action-space-16-types) |
+| TARGETS.md / SKILLS.md config | [deployment.md §5-6](../../scenarios/game/minecraft/en/deployment.md#5-targetsmd-configuration) |
+| Agent → SESSIONS.md pipeline | [deployment.md §7](../../scenarios/game/minecraft/en/deployment.md#7-full-pipeline-agent-task-dispatch) |
+| CLI & chat control | [usage.md](../../scenarios/game/minecraft/en/usage.md) |
+| Bot teleporting | [usage.md §3](../../scenarios/game/minecraft/en/usage.md#3-bot-teleporting) |
+| 9 troubleshooting entries | [usage.md §5](../../scenarios/game/minecraft/en/usage.md#5-troubleshooting) |
+| Code change reference | [usage.md §6](../../scenarios/game/minecraft/en/usage.md#6-code-change-reference) |
+
+---
+
 ## 2.7 Runtime File Reference
 
 | File | Location | Purpose |
@@ -451,6 +505,20 @@ Verify: Agent recognizes multiple robot instances, actions dispatched to correct
 paos agent -m "open simulation"
 paos agent -m "go to desk"
 paos agent -m "pick up the red cube and return to the starting position"
+```
+
+### Minecraft Natural Language Control
+
+```bash
+paos minecraft say "mine 5 oak logs and come over"
+```
+
+The LLM auto-converts natural language into Minecraft action sequences.
+
+You can also command the bot through in-game chat:
+```bash
+python test/chat_listener.py
+# In Minecraft chat say: paos mine 5 oak logs
 ```
 
 ### VLA Model Grasping
@@ -522,6 +590,32 @@ Customize your VLA checkpoint by editing the `vla` block in `examples/pipergo2_m
 2. Check path config in `pipergo2_manipulation_driver.json` `isaac_env` block
 3. In `--vnc` mode, inspect first-start re-exec logs
 4. Verify `LD_LIBRARY_PATH` is correctly set (auto-handled in VNC mode)
+
+### Minecraft Bridge Connection Failure (SSL Error)
+
+**Symptom**: `SSL: CERTIFICATE_VERIFY_FAILED`.
+
+**Resolution**:
+1. Free ngrok has incomplete certificates; add `"verify_ssl": false` in TARGETS.md config
+2. If still failing, check for extra whitespace around the `bridge_url` value
+
+### Minecraft API Returns Empty or HTML
+
+**Symptom**: `JSONDecodeError: Expecting value` or HTML confirmation page returned.
+
+**Resolution**:
+1. Free ngrok shows a confirmation page first; ensure `ngrok-skip-browser-warning: true` header is set in `minecraft_target.py`
+2. Verify the ngrok tunnel is still running
+3. Confirm the bridge URL includes the `https://` prefix
+
+### Minecraft Bot Teleport Not Working
+
+**Symptom**: Bot stuck at spawn point, can't move to player.
+
+**Resolution**:
+1. Ensure cheats are enabled (Esc → Open to LAN → Allow Cheats: ON)
+2. Player must be within the bot's render distance
+3. Use `test/tp_bot.py` to manually teleport the bot to your coordinates
 
 ---
 

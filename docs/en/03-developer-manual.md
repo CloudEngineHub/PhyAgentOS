@@ -182,6 +182,14 @@ class StardewTarget(BaseRolloutTarget):
     def step(self, action): ...# Execute move_to/interact/sleep
     def close(self): ...       # Disconnect SMAPI
 
+# Game Target: Minecraft (verified)
+class MinecraftTarget(BaseLocalTarget):
+    def build(self): ...       # HTTP GET /health → verify bridge reachable
+    def reset(self, ctx): ...  # Initial observation (position/inventory/nearby blocks/entities)
+    def observe(self): ...     # HTTP GET /state → full game snapshot
+    def step(self, action): ...# HTTP POST /action → mineflayer execution
+    def close(self): ...       # Release HTTP client
+
 # Scenario 2: Simulation Target
 class ManiSkillTarget(BaseRolloutTarget):
     def build(self): ...       # Initialize ManiSkill environment
@@ -465,6 +473,10 @@ class MyTarget(BaseRolloutTarget):
 ```
 
 **No need to understand**: Watchdog, Session state machine, file protocol, Critic — the Base layer handles all of that.
+
+> **Reference implementation**: `runtime/targets/game/minecraft_target.py` (182 lines) is a clean `BaseLocalTarget` implementation. It has zero Minecraft protocol dependencies (no pyCraft), communicating only via HTTP to an external mineflayer bridge. Suitable as a reference template for game-type Targets.
+>
+> Deployment guides, usage details, and 9 troubleshooting entries are in the [Minecraft scenario docs](../../scenarios/game/minecraft/en/deployment.md).
 
 ---
 
