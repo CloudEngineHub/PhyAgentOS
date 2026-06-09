@@ -215,8 +215,6 @@ def onboard():
             console.print(f"[green]✓[/green] Created workspace at {workspace}")
         sync_workspace_templates(workspace, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
 
-    _setup_minecraft_workspace_from_targets(workspace)
-
     console.print(f"\n{__logo__} PhyAgentOS is ready!")
     console.print("\nNext steps:")
     console.print("  1. Add your API key to [cyan]~/.PhyAgentOS/config.json[/cyan]")
@@ -535,62 +533,6 @@ def gateway(
 # ============================================================================
 # Commands
 # ============================================================================
-
-TARGET_MC_PATTERN = "minecraft_java_env"
-
-
-def _setup_minecraft_workspace_from_targets(workspace: Path) -> None:
-    """If TARGETS.md contains a minecraft target, set up its workspace with
-    the minecraft-specific EMBODIED.md and ACTION.md."""
-    targets_file = workspace / "TARGETS.md"
-    if not targets_file.exists():
-        return
-
-    targets_content = targets_file.read_text(encoding="utf-8")
-    if TARGET_MC_PATTERN not in targets_content:
-        return
-
-    try:
-        import yaml
-        targets_data = yaml.safe_load(targets_content)
-    except Exception:
-        return
-
-    if not isinstance(targets_data, dict):
-        return
-
-    target_list = targets_data.get("targets", [])
-    if not isinstance(target_list, list):
-        return
-
-    for target in target_list:
-        if not isinstance(target, dict):
-            continue
-        if target.get("id") != TARGET_MC_PATTERN:
-            continue
-        target_workspace_rel = target.get("workspace", "workspaces/minecraft")
-        target_workspace = workspace / target_workspace_rel
-        target_workspace.mkdir(parents=True, exist_ok=True)
-
-        # ── copy minecraft EMBODIED.md ──
-        from importlib.resources import files as pkg_files
-        try:
-            tpl_dir = pkg_files("PhyAgentOS") / "templates"
-            mc_embodied_src = tpl_dir / "minecraft_embodied.md"
-            embodied_dst = target_workspace / "EMBODIED.md"
-            if mc_embodied_src.exists() and not embodied_dst.exists():
-                embodied_dst.write_text(mc_embodied_src.read_text(encoding="utf-8"), encoding="utf-8")
-                console.print(f"[green]✓[/green] Created EMBODIED.md for {TARGET_MC_PATTERN} at {embodied_dst}")
-        except Exception:
-            pass
-
-        # ── ensure ACTION.md exists ──
-        action_file = target_workspace / "ACTION.md"
-        if not action_file.exists():
-            from PhyAgentOS.utils.action_queue import dump_action_document, empty_action_document
-            action_file.write_text(dump_action_document(empty_action_document()), encoding="utf-8")
-            console.print(f"[green]✓[/green] Created ACTION.md for {TARGET_MC_PATTERN} at {action_file}")
-        break
 
 
 @app.command()
@@ -1043,6 +985,24 @@ def _login_github_copilot() -> None:
 minecraft_app = typer.Typer(help="Minecraft game agent demo")
 app.add_typer(minecraft_app, name="minecraft")
 
+_MC_SYSTEM_PROMPT = (
+    "你是 Minecraft 机器人控制器。将用户指令转为 JSON 动作列表。\n"
+    "可用动作: move/look/dig/place/collect/craft/chat/jump/sneak/sprint/"
+    "attack/interact/use/select_slot/drop/equip.\n"
+    "move 参数: {dx, dy, dz, absolute: true/false} 或 {target: \"player\"/\"pig\"/...} 追踪实体\n"
+    "chat 参数: {message}\n"
+    "look 参数: {yaw, pitch}\n"
+    "collect 参数: {block_type, count}\n"
+    "dig 参数: {x, y, z}\n"
+    "place 参数: {x, y, z, face}\n"
+    "只返回 JSON 数组。示例:\n"
+    '[{"type":"chat","params":{"message":"收到"}},'
+    '{"type":"collect","params":{"block_type":"oak_log","count":5}},'
+    '{"type":"chat","params":{"message":"完成"}}]\n'
+    "追踪玩家: [{\"type\":\"move\",\"params\":{\"target\":\"player\"}},"
+    '{"type":"chat","params":{"message":"我来了"}}]'
+)
+
 
 @minecraft_app.command("say")
 def minecraft_say(
@@ -1053,37 +1013,18 @@ def minecraft_say(
     ),
 ):
     """用自然语言控制 Minecraft bot"""
+    import asyncio
     import json
+    import os
 
     config = _load_runtime_config()
     provider = _make_provider(config)
 
-    system_prompt = (
-        "你控制一个 Minecraft 机器人。将用户的请求转为 JSON action 列表。\n"
-        "可用动作: move/look/dig/place/collect/craft/chat/jump/sneak/sprint/"
-        "attack/interact/use/select_slot/drop/equip.\n"
-        "move 参数: {dx, dy, dz, absolute: true/false} 或 {target: \"player\"/\"pig\"/...} 追踪实体\n"
-        "chat 参数: {message}\n"
-        "look 参数: {yaw, pitch}\n"
-        "collect 参数: {block_type, count}\n"
-        "dig 参数: {x, y, z}\n"
-        "place 参数: {x, y, z, face}\n"
-        "只返回 JSON 数组，不要其他文字。示例:\n"
-        '[{\"type\":\"chat\",\"params\":{\"message\":\"收到\"}},'
-        '{\"type\":\"collect\",\"params\":{\"block_type\":\"oak_log\",\"count\":5}},'
-        '{\"type\":\"chat\",\"params\":{\"message\":\"完成\"}}]\n'
-        "追踪玩家: [{\"type\":\"move\",\"params\":{\"target\":\"player\"}},"
-        '{\"type\":\"chat\",\"params\":{\"message\":\"我来了\"}}]\n'
-        "追踪实体: [{\"type\":\"move\",\"params\":{\"target\":\"pig\"}},"
-        '{\"type\":\"chat\",\"params\":{\"message\":\"找到猪了\"}}]'
-    )
-
     console.print("[dim]Paos 思考中...[/dim]")
-    import asyncio
 
     async def _ask():
         resp = await provider.chat_with_retry(messages=[
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": _MC_SYSTEM_PROMPT},
             {"role": "user", "content": instruction},
         ])
         return resp.content.strip()
@@ -1092,10 +1033,12 @@ def minecraft_say(
 
     try:
         if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        plan = json.loads(raw)
+            plan_raw = raw.split("```")[1]
+            if plan_raw.startswith("json"):
+                plan_raw = plan_raw[4:]
+            plan = json.loads(plan_raw)
+        else:
+            plan = json.loads(raw)
         if not isinstance(plan, list):
             raise ValueError("not a list")
     except Exception:
@@ -1106,31 +1049,169 @@ def minecraft_say(
     for i, a in enumerate(plan):
         console.print(f"  {i+1}. {a['type']}: {a.get('params', {})}")
 
-    from PhyAgentOS.utils.action_queue import append_action, dump_action_document, empty_action_document
+    from PhyAgentOS.runtime.schemas import SessionSpec, AdapterPlan
+    from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
+    from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
+    from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
 
-    workspace = get_workspace_path()
-    mc_workspace = workspace / "workspaces" / "minecraft"
-    mc_workspace.mkdir(parents=True, exist_ok=True)
-    action_file = mc_workspace / "ACTION.md"
+    target = MinecraftTarget({"bridge_url": bridge_url, "verify_ssl": False})
+    session = SessionSpec(
+        session_id=f"sess_cli_{os.urandom(3).hex()}",
+        target_ref="target://minecraft_java_env",
+        skill_ref="skill://minecraft_navigate",
+        task_description=instruction,
+        execution={"max_steps": len(plan) + 5},
+        runtime_hints={"perception_queries": plan},
+    )
 
-    document = empty_action_document()
-    for step in plan:
-        action_type = step.get("type", "")
-        parameters = step.get("params", {})
-        if action_type:
-            document = append_action(document, action_type=action_type, parameters=parameters)
+    console.print()
+    result = MinecraftSkillRuntime().run(
+        session, target, MinecraftTargetAdapter(),
+        None, [], None,
+        AdapterPlan(target_adapter="target_adapter://minecraft_adapter"),
+    )
+    console.print(f"\n[green]完成: {result.num_steps} 步, status={result.status}[/green]")
 
-    action_file.write_text(dump_action_document(document), encoding="utf-8")
-    console.print(f"\n[dim]已写入 {len(plan)} 步动作到 {action_file}[/dim]")
-    console.print("[dim]启动 watchdog 执行:[/dim]")
-    console.print("  [cyan]python -c \"from pathlib import Path; from PhyAgentOS.runtime.watchdog.minecraft_action_runner import MinecraftActionRunner;")
-    console.print(f"  r = MinecraftActionRunner(Path('{mc_workspace}'), {{'bridge_url': '{bridge_url}', 'verify_ssl': False}});")
-    console.print("  r._ensure_target(); r.run_once(); r.stop()\"[/cyan]")
-    console.print("\n[dim]或持续轮询:[/dim]")
-    console.print("  [cyan]python -c \"from pathlib import Path; from PhyAgentOS.runtime.watchdog.minecraft_action_runner import MinecraftActionRunner;")
-    console.print(f"  MinecraftActionRunner(Path('{mc_workspace}'), {{'bridge_url': '{bridge_url}', 'verify_ssl': False}}).run_forever()\"[/cyan]")
+
+@minecraft_app.command("listen")
+def minecraft_listen(
+    bridge_url: str = typer.Option(
+        "https://carucated-kattie-cryptogamic.ngrok-free.dev",
+        "--url", "-u", help="Bridge HTTP API URL",
+    ),
+    poll_interval: float = typer.Option(
+        3.0, "--interval", "-i", help="轮询间隔（秒）",
+    ),
+    prefix: str = typer.Option(
+        "paos", "--prefix", "-p", help="游戏内指令前缀",
+    ),
+):
+    """监听 Minecraft 聊天，自动响应带前缀的消息"""
+    import asyncio
+    import json
+    import os
+    import time
+
+    config = _load_runtime_config()
+    provider = _make_provider(config)
+
+    from PhyAgentOS.runtime.schemas import SessionSpec, AdapterPlan
+    from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
+    from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
+    from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
+    from PhyAgentOS.runtime.watchdog.errors import TargetConnectionError
+
+    target = MinecraftTarget({"bridge_url": bridge_url, "verify_ssl": False})
+    try:
+        target.build()
+    except TargetConnectionError as e:
+        console.print(f"[red]连接失败: {e}[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[green]✓[/green] 已连接 bridge，监听游戏聊天中... (前缀: {prefix}, 间隔: {poll_interval}s)")
+    console.print("[dim]在游戏里说 'paos 挖5个橡木' 即可触发[/dim]")
+    console.print("[dim]Ctrl+C 停止[/dim]\n")
+
+    seen: set[str] = set()
+    first_poll = True
+
+    try:
+        while True:
+            obs = target.observe()
+            chats = obs.get("last_chats", [])
+            if not isinstance(chats, list):
+                time.sleep(poll_interval)
+                continue
+
+            if first_poll:
+                first_poll = False
+                for c in chats:
+                    if isinstance(c, dict):
+                        key = f"{c.get('username','')}:{c.get('message','')}:{c.get('time',0)}"
+                        seen.add(key)
+                console.print("[dim]已跳过历史消息，等待新指令...[/dim]")
+                time.sleep(poll_interval)
+                continue
+
+            for c in chats:
+                if not isinstance(c, dict):
+                    continue
+                username = c.get("username", "")
+                message = c.get("message", "")
+                chat_time = c.get("time", 0)
+                key = f"{username}:{message}:{chat_time}"
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                if str(username).lower() == "paos":
+                    continue
+
+                stripped = message.strip()
+                if not stripped.lower().startswith(prefix.lower()):
+                    continue
+
+                instruction = stripped[len(prefix):].strip()
+                if not instruction:
+                    continue
+
+                console.print(f"[游戏] <{username}> {message}")
+
+                async def _ask():
+                    resp = await provider.chat_with_retry(messages=[
+                        {"role": "system", "content": _MC_SYSTEM_PROMPT},
+                        {"role": "user", "content": instruction},
+                    ])
+                    return resp.content.strip()
+
+                try:
+                    raw = asyncio.run(_ask())
+                except Exception:
+                    console.print("[red]LLM 调用失败[/red]")
+                    continue
+
+                try:
+                    if "```" in raw:
+                        plan_raw = raw.split("```")[1]
+                        if plan_raw.startswith("json"):
+                            plan_raw = plan_raw[4:]
+                        plan = json.loads(plan_raw)
+                    else:
+                        plan = json.loads(raw)
+                    if not isinstance(plan, list):
+                        raise ValueError("not a list")
+                except Exception:
+                    console.print(f"[red]LLM 返回格式错误: {raw[:200]}[/red]")
+                    continue
+
+                console.print(f"  → 生成 {len(plan)} 步动作")
+                for i, a in enumerate(plan):
+                    console.print(f"    {i+1}. {a['type']}: {a.get('params', {})}")
+
+                session = SessionSpec(
+                    session_id=f"sess_chat_{os.urandom(3).hex()}",
+                    target_ref="target://minecraft_java_env",
+                    skill_ref="skill://minecraft_navigate",
+                    task_description=instruction,
+                    execution={"max_steps": len(plan) + 5},
+                    runtime_hints={"perception_queries": plan},
+                )
+                try:
+                    result = MinecraftSkillRuntime().run(
+                        session, target, MinecraftTargetAdapter(),
+                        None, [], None,
+                        AdapterPlan(target_adapter="target_adapter://minecraft_adapter"),
+                    )
+                    console.print(f"  [green]完成: {result.num_steps} 步, status={result.status}[/green]")
+                except Exception as e:
+                    console.print(f"  [red]执行异常: {e}[/red]")
+
+            time.sleep(poll_interval)
+    except KeyboardInterrupt:
+        target.close()
+        console.print("\n已停止")
+
 
 
 if __name__ == "__main__":
     app()
-
