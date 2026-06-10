@@ -52,7 +52,7 @@ class WorkspaceWatcher:
     def _watched_files(self) -> dict[str, Path]:
         return {
             "targets": self.paths.targets,
-            "skills": self.paths.skills,
+            "skillruntimes": self.paths.skillruntimes,
             "sessions": self.paths.sessions,
             "environment": self.paths.environment,
         }

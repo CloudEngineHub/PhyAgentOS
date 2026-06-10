@@ -307,7 +307,7 @@ targets:
     type: sim
     workspace: workspaces/minecraft
     enabled: true
-    supported_skills: [minecraft_navigate, minecraft_mine, minecraft_build]
+    supported_skillruntimes: [minecraft_navigate, minecraft_mine, minecraft_build]
     runtime:
       target_runtime: MinecraftTargetRuntime
       target_endpoint: targetws://local/minecraft_java_env
@@ -319,7 +319,7 @@ targets:
       step_delay: 0.1
 ```
 
-## 六、配置 SKILLS.md
+## 六、配置 SKILLRUNTIME.md
 
 ```yaml
 skills:
@@ -339,7 +339,7 @@ skills:
 sessions:
   - session_id: sess_mc_demo
     target_ref: target://minecraft_java_env
-    skill_ref: skill://minecraft_navigate
+    skillruntime_ref: skillruntime://minecraft_navigate
     task_description: "go to (100, 64, 200), say hello, mine 5 oak logs"
     status: pending
     timeouts:
@@ -381,7 +381,7 @@ sessions:
 |------|------|------|
 | `runtime/targets/game/minecraft_target.py` | 267 | MinecraftTarget（HTTP 客户端，继承 BaseLocalTarget） |
 | `runtime/adapters/minecraft/minecraft_adapter.py` | 83 | Observation/Action 归一化 |
-| `runtime/skills/game/minecraft_skill_runtime.py` | 241 | Episode 驱动循环（含 entity 解析 + 到达检测） |
+| `runtime/skillruntime/game/minecraft_skill_runtime.py` | 241 | Episode 驱动循环（含 entity 解析 + 到达检测） |
 | `runtime/targets/factory.py` | +4 | 注册 MinecraftTargetRuntime |
 | `runtime/adapters/factory.py` | +3 | 注册 minecraft_adapter |
 | `cli/minecraft_commands.py` | 239 | `minecraft_say` + `minecraft_listen` 命令 |

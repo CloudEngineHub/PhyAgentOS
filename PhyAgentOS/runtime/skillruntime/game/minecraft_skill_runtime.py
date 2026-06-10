@@ -7,7 +7,7 @@ import time
 from typing import Any
 
 from PhyAgentOS.runtime.schemas import AdapterPlan, SessionResult, SessionSpec
-from PhyAgentOS.runtime.skills.base import BaseSkillRuntime
+from PhyAgentOS.runtime.skillruntime.base import BaseSkillRuntime
 from PhyAgentOS.runtime.watchdog.errors import SessionTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class MinecraftSkillRuntime(BaseSkillRuntime):
             "session_id": session.session_id,
             "task_description": session.task_description,
             "target_ref": session.target_ref,
-            "skill_ref": session.skill_ref,
+            "skillruntime_ref": session.skillruntime_ref,
         })
 
         raw_obs = target.reset(session_ctx)

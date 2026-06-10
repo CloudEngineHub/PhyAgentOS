@@ -314,7 +314,7 @@ targets:
     type: game
     workspace: workspaces/minecraft
     enabled: true
-    supported_skills: [minecraft_navigate, minecraft_mine, minecraft_build]
+    supported_skillruntimes: [minecraft_navigate, minecraft_mine, minecraft_build]
     runtime:
       target_runtime: MinecraftTargetRuntime
       target_endpoint: targetws://local/minecraft_java_env
@@ -327,7 +327,7 @@ targets:
       verify_ssl: false
 ```
 
-## 6. SKILLS.md Configuration
+## 6. SKILLRUNTIME.md Configuration
 
 ```yaml
 skills:
@@ -349,7 +349,7 @@ skills:
 sessions:
   - session_id: sess_mc_demo
     target_ref: target://minecraft_java_env
-    skill_ref: skill://minecraft_navigate
+    skillruntime_ref: skillruntime://minecraft_navigate
     task_description: "go to (100, 64, 200), say hello, mine 5 oak logs"
     status: pending
     timeouts:
@@ -391,7 +391,7 @@ sessions:
 |------|-------|-------------|
 | `runtime/targets/game/minecraft_target.py` | 182 | MinecraftTarget (HTTP client, extends BaseLocalTarget) |
 | `runtime/adapters/minecraft/minecraft_adapter.py` | 83 | Observation/Action normalization |
-| `runtime/skills/game/minecraft_skill_runtime.py` | 115 | Episode drive loop |
+| `runtime/skillruntime/game/minecraft_skill_runtime.py` | 115 | Episode drive loop |
 | `runtime/targets/factory.py` | +4 | Register MinecraftTargetRuntime |
 | `runtime/adapters/factory.py` | +3 | Register minecraft_adapter |
 | `tests/runtime/test_minecraft_target.py` | 16 tests | Unit tests (Mock HTTP bridge) |

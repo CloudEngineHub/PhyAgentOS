@@ -81,7 +81,7 @@ def minecraft_say(
         console.print(f"  {i+1}. {a['type']}: {a.get('params', {})}")
 
     from PhyAgentOS.runtime.schemas import SessionSpec, AdapterPlan
-    from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
+    from PhyAgentOS.runtime.skillruntime.game.minecraft_skill_runtime import MinecraftSkillRuntime
     from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
     from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
 
@@ -89,7 +89,7 @@ def minecraft_say(
     session = SessionSpec(
         session_id=f"sess_cli_{os.urandom(3).hex()}",
         target_ref="target://minecraft_java_env",
-        skill_ref="skill://minecraft_navigate",
+        skillruntime_ref="skillruntime://minecraft_navigate",
         task_description=instruction,
         execution={"max_steps": len(plan) + 5},
         runtime_hints={"perception_queries": plan},
@@ -124,7 +124,7 @@ def minecraft_listen(
     provider = _make_provider(config)
 
     from PhyAgentOS.runtime.schemas import SessionSpec, AdapterPlan
-    from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
+    from PhyAgentOS.runtime.skillruntime.game.minecraft_skill_runtime import MinecraftSkillRuntime
     from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
     from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
     from PhyAgentOS.runtime.watchdog.errors import TargetConnectionError
@@ -219,7 +219,7 @@ def minecraft_listen(
                 session = SessionSpec(
                     session_id=f"sess_chat_{os.urandom(3).hex()}",
                     target_ref="target://minecraft_java_env",
-                    skill_ref="skill://minecraft_navigate",
+                    skillruntime_ref="skillruntime://minecraft_navigate",
                     task_description=instruction,
                     execution={"max_steps": len(plan) + 5},
                     runtime_hints={"perception_queries": plan},

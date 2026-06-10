@@ -16,9 +16,12 @@ from PhyAgentOS.runtime.state_io.atomic_file import atomic_write_text
 from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block, write_yaml_block
 from PhyAgentOS.runtime.watchdog.supervisor import WatchdogSupervisor
 
-RUNTIME_TEMPLATE_NAMES = ("TARGETS.md", "SKILLS.md")
+RUNTIME_TEMPLATE_NAMES = ("TARGETS.md", "SKILLRUNTIME.md")
 RUNTIME_CONFIG_TEMPLATE_NAMES = (
+    "configs/runtime/contracts/dummy_sim.runtime.yaml",
     "configs/runtime/contracts/libero_real.runtime.yaml",
+    "configs/runtime/contracts/minecraft.runtime.yaml",
+    "configs/runtime/sensors/dummy_sim.sensors.yaml",
 )
 _RUNTIME_INSTRUCTIONS = """# Runtime Protocol
 
@@ -28,7 +31,7 @@ runtime sessions. Do not use this file as runtime state.
 ## Runtime Files
 
 - `TARGETS.md`: user-maintained target registry.
-- `SKILLS.md`: available runtime skills.
+- `SKILLRUNTIME.md`: available runtime skill runtimes.
 - `SESSIONS.md`: runtime session queue; the watchdog claims `pending` sessions.
 - `ENVIRONMENT.md`: runtime environment state. It is created empty, then the
   runtime manager writes a target registry snapshot. Scene/object state is
@@ -47,7 +50,7 @@ sessions:
   - session_id: unique_short_id
     goal_id: optional_goal_id
     target_ref: target://target_id_from_TARGETS
-    skill_ref: skill://skill_id_from_SKILLS
+    skillruntime_ref: skillruntime://skillruntime_id_from_SKILLRUNTIME
     task_description: user-facing task description
     status: pending
     priority: normal
@@ -82,11 +85,11 @@ sessions:
 
 Rules:
 
-- Read `TARGETS.md` and `SKILLS.md` before creating a session. Read
+- Read `TARGETS.md` and `SKILLRUNTIME.md` before creating a session. Read
   `ENVIRONMENT.md` for the latest target runtime snapshot.
 - Use only targets whose `TARGETS.md` entry has `enabled: true`.
-- `target_ref` must match an id in `TARGETS.md`; `skill_ref` must be listed in
-  that target's `supported_skills`.
+- `target_ref` must match an id in `TARGETS.md`; `skillruntime_ref` must be listed in
+  that target's `supported_skillruntimes`.
 - Use endpoint values declared in `TARGETS.md` unless the user explicitly
   provides a different endpoint.
 - Do not manually edit `ENVIRONMENT.md`; it is runtime state managed by
@@ -273,7 +276,7 @@ class RuntimeWorkspaceManager:
             "target_class": target.get("target_class"),
             "target_kind": target.get("target_kind"),
             "workspace": target.get("workspace"),
-            "supported_skills": list(target.get("supported_skills") or []),
+            "supported_skillruntimes": list(target.get("supported_skillruntimes") or []),
             "connection_state": {
                 "status": "disabled" if not enabled else ("configured" if endpoint else "unconfigured"),
                 "endpoint": endpoint,

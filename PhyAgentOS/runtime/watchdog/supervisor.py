@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from PhyAgentOS.runtime.perception import PerceptionRuntime
 from PhyAgentOS.runtime.policy.factory import build_policy_client
 from PhyAgentOS.runtime.preflight import RuntimeCompatibilityPreflight
-from PhyAgentOS.runtime.schemas import SessionsDocument, SkillsDocument, TargetsDocument
+from PhyAgentOS.runtime.schemas import SessionsDocument, SkillRuntimeDocument, TargetsDocument
 from PhyAgentOS.runtime.schemas.result import SessionResult
 from PhyAgentOS.runtime.sessions.session_runner import SessionRunner
 from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block
@@ -53,9 +53,9 @@ class WatchdogSupervisor:
         self.preflight = RuntimeCompatibilityPreflight(self.workspace, self.skill_registry)
 
     def run_once(self) -> bool:
-        sessions_doc, targets_doc, skills_doc = self._load_runtime_documents()
+        sessions_doc, targets_doc, skillruntimes_doc = self._load_runtime_documents()
         try:
-            scheduled = self.scheduler.select_next(sessions_doc, targets_doc, skills_doc)
+            scheduled = self.scheduler.select_next(sessions_doc, targets_doc, skillruntimes_doc)
         except SessionScheduleError as exc:
             self.failure_escalator.handle(exc.session_id, exc, self.registry)
             return True
@@ -67,11 +67,11 @@ class WatchdogSupervisor:
 
         try:
             session = self.registry.get_session(session_id)
-            _, targets_doc, skills_doc = self._load_runtime_documents()
-            scheduled = self.scheduler.resolve_session(session, targets_doc, skills_doc)
+            _, targets_doc, skillruntimes_doc = self._load_runtime_documents()
+            scheduled = self.scheduler.resolve_session(session, targets_doc, skillruntimes_doc)
             self.registry.mark_preflight_checking(session_id)
             session = self.registry.get_session(session_id)
-            scheduled = self.scheduler.resolve_session(session, targets_doc, skills_doc)
+            scheduled = self.scheduler.resolve_session(session, targets_doc, skillruntimes_doc)
             health_report = self.health_monitor.preflight(scheduled)
             if not health_report.ok:
                 raise SchemaValidationError(health_report.summary())
@@ -89,7 +89,7 @@ class WatchdogSupervisor:
                 self.result_writer.write_lesson(
                     session,
                     scheduled.target_spec.id,
-                    scheduled.skill_id,
+                    scheduled.skillruntime_id,
                     "preflight_checking",
                     result.error_code,
                     result.error_message or "runtime compatibility preflight failed",
@@ -102,20 +102,20 @@ class WatchdogSupervisor:
 
             self.registry.mark_running(session_id)
             session = self.registry.get_session(session_id)
-            scheduled = self.scheduler.resolve_session(session, targets_doc, skills_doc)
+            scheduled = self.scheduler.resolve_session(session, targets_doc, skillruntimes_doc)
             target_endpoint = session.routing.target_endpoint or scheduled.target_spec.runtime.target_endpoint
             target = self.target_registry.build(scheduled.target_spec, target_endpoint=target_endpoint)
             policy_client = None
             runner = None
             cleanup_in_background = False
             try:
-                if scheduled.skill_spec.runtime_kind == "policy":
+                if scheduled.skillruntime_spec.runtime_kind == "policy":
                     policy_client = self._build_policy_client(session, scheduled.target_spec)
-                runtime = self.skill_registry.build(scheduled.skill_spec.runtime)
+                runtime = self.skill_registry.build(scheduled.skillruntime_spec.runtime)
                 runner = SessionRunner(
                     session=session,
                     target_spec=scheduled.target_spec,
-                    skill_spec=scheduled.skill_spec,
+                    skillruntime_spec=scheduled.skillruntime_spec,
                     adapter_plan=preflight_result.adapter_plan,
                     target=target,
                     skill_runtime=runtime,
@@ -150,7 +150,7 @@ class WatchdogSupervisor:
                         result = self.result_writer.write_episode(
                             session,
                             scheduled.target_spec,
-                            scheduled.skill_id,
+                            scheduled.skillruntime_id,
                             result,
                         )
                         self.result_writer.write_session_history(session, scheduled.target_spec, result)
@@ -175,7 +175,7 @@ class WatchdogSupervisor:
             result = self.result_writer.write_episode(
                 session,
                 scheduled.target_spec,
-                scheduled.skill_id,
+                scheduled.skillruntime_id,
                 result,
             )
             self.result_writer.write_session_history(session, scheduled.target_spec, result)
@@ -185,20 +185,20 @@ class WatchdogSupervisor:
             self.failure_escalator.handle(session_id, exc, self.registry)
             return True
 
-    def _load_runtime_documents(self) -> tuple[SessionsDocument, TargetsDocument, SkillsDocument]:
+    def _load_runtime_documents(self) -> tuple[SessionsDocument, TargetsDocument, SkillRuntimeDocument]:
         try:
             sessions_doc = SessionsDocument.model_validate(read_yaml_block(self.paths.sessions))
             targets_doc = TargetsDocument.model_validate(read_yaml_block(self.paths.targets))
-            skills_doc = SkillsDocument.model_validate(read_yaml_block(self.paths.skills))
-            return sessions_doc, targets_doc, skills_doc
+            skillruntimes_doc = SkillRuntimeDocument.model_validate(read_yaml_block(self.paths.skillruntimes))
+            return sessions_doc, targets_doc, skillruntimes_doc
         except ValidationError as exc:
             raise SchemaValidationError(str(exc)) from exc
 
-    def _load_registries(self) -> tuple[TargetsDocument, SkillsDocument]:
+    def _load_registries(self) -> tuple[TargetsDocument, SkillRuntimeDocument]:
         try:
             targets_doc = TargetsDocument.model_validate(read_yaml_block(self.paths.targets))
-            skills_doc = SkillsDocument.model_validate(read_yaml_block(self.paths.skills))
-            return targets_doc, skills_doc
+            skillruntimes_doc = SkillRuntimeDocument.model_validate(read_yaml_block(self.paths.skillruntimes))
+            return targets_doc, skillruntimes_doc
         except ValidationError as exc:
             raise SchemaValidationError(str(exc)) from exc
 

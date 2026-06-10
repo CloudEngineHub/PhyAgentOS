@@ -75,10 +75,12 @@ The following files are often more important than class diagrams:
 
 | File | Logical Meaning |
 |------|----------------|
+| `TARGETS.md` | Runtime target registry and endpoint / adapter / contract references |
+| `SKILLRUNTIME.md` | Executable policy/builtin skill runtime declarations |
+| `SESSIONS.md` | Execution intent and result ground truth |
 | `ENVIRONMENT.md` | Environment state ground truth |
-| `EMBODIED.md` | Robot capability ground truth |
-| `SESSIONS.md` | Execution intent ground truth |
-| `ACTION.md` | Action queue ground truth |
+| `EMBODIED.md` | Agent-facing target capability prose |
+| `SKILLS.md` | Agent-facing skill discovery and loading rules |
 | `LESSONS.md` | Failure experience ground truth |
 
 **Reading only the code without understanding the files will lead to misinterpreting system behavior.**
@@ -96,7 +98,7 @@ When developing any functionality involving embodied actions, navigation, or con
 |---------|----------|---------|
 | **Templates** | `PhyAgentOS/templates/` | Define file structure and suggested fields |
 | **Profile** | `hal/profiles/` | Static capability declaration for a robot type |
-| **Runtime Files** | workspace/ | Actual state surface read/written by Agent/Critic/Watchdog |
+| **Runtime Files** | workspace/ | Actual state surface read/written by Agent, Watchdog, and runtime writers |
 
 In short: **Templates define structure, Profiles provide instance type descriptions, Runtime files carry live state.**
 
@@ -206,7 +208,7 @@ class CompositeTarget(BaseRolloutTarget):  # Go2 + Franka
 
 ### 3.3.3 BaseSkillRuntime Interface
 
-**Location**: `PhyAgentOS/runtime/skills/base.py` (new version)
+**Location**: `PhyAgentOS/runtime/skillruntime/base.py` (new version)
 
 ```python
 class BaseSkillRuntime(ABC):
@@ -301,30 +303,20 @@ class AgentLoop:
 ```
 
 Workflow:
-1. Build context from workspace files (ENVIRONMENT.md, EMBODIED.md, LESSONS.md)
+1. Build context from bootstrap files (`AGENTS.md`, `SOUL.md`, `USER.md`, `TOOLS.md`, `SKILLS.md`) plus state files such as `ENVIRONMENT.md`, `EMBODIED.md`, and `LESSONS.md`
 2. Call LLM for planning and reasoning
-3. Handle tool invocations (EmbodiedActionTool, SemanticNavigationTool, etc.)
-4. Write actions to ACTION.md / SESSIONS.md
+3. Handle tool invocations and skill-guided workflows
+4. For runtime execution, read `TARGETS.md` / `SKILLRUNTIME.md` and append work to `SESSIONS.md`
 5. Manage conversation history
 
-#### Critic Validation Framework
+#### Runtime Session Validation
 
-**Location**: `PhyAgentOS/agent/tools/embodied.py`
+**Location**: `PhyAgentOS/runtime/preflight/`
 
-EmbodiedActionTool responsibilities:
-- Resolve target `robot_id` in fleet mode
-- Locate `EMBODIED.md`, `ENVIRONMENT.md`, `ACTION.md` for target robot
-- Submit action draft, environment state, capability declaration to Critic
-- Write to `ACTION.md` on validation pass
-- Record to `LESSONS.md` on validation failure
-
-New Critic also validates:
-1. Whether target is available
-2. Whether target supports the skill
-3. Whether skill meets input preconditions
-4. Whether session exceeds safety boundaries
-5. Whether task should be assigned to sim or real
-6. Whether fallback chain exists
+Runtime validation happens before execution. It resolves the requested
+`target_ref` and `skillruntime_ref`, checks whether the target supports the
+skill runtime, validates sensor/perception/runtime contracts, and rejects
+invalid sessions before a target or policy runtime is started.
 
 #### Skill System
 
@@ -374,48 +366,30 @@ class Config(BaseModel):
 
 ### 3.3.8 File Protocol Conventions
 
-#### ACTION.md Format
+#### SESSIONS.md Format
 
-Watchdog extracts the first JSON code block from `ACTION.md`:
-
-```json
-{
-  "action_type": "move_to",
-  "parameters": {
-    "x": 10,
-    "y": 20,
-    "z": 5
-  },
-  "status": "pending"
-}
+```yaml
+version: runtime_sessions_v1
+sessions:
+  - session_id: sess_example
+    target_ref: target://dummy_sim
+    skillruntime_ref: skillruntime://openpi_sim_vla
+    task_description: run a smoke test
+    status: pending
+    priority: normal
 ```
 
-When developing custom tools or external plugins, you MUST maintain this convention, or the Watchdog cannot parse.
-
-#### SESSIONS.md Format (New Protocol)
-
-```json
-{
-  "session_id": "uuid",
-  "goal": "pick up the red cube",
-  "target": "simulation://default",
-  "skill": "vla_pick",
-  "params": {"object": "red_cube"},
-  "status": "pending"
-}
-```
-
-#### Action Validate-Dispatch-Execute Pipeline
+#### Session Validate-Dispatch-Execute Pipeline
 
 ```
-1. Agent forms action intent
-2. EmbodiedActionTool performs Critic validation
-3. On pass: writes to ACTION.md / SESSIONS.md
-4. Watchdog consumes and executes action
-5. Results written back to ENVIRONMENT.md / LESSONS.md
+1. Agent forms task intent
+2. Agent resolves target and skill runtime from TARGETS.md / SKILLRUNTIME.md
+3. Agent appends a pending session to SESSIONS.md
+4. Watchdog claims the session and runs preflight
+5. SessionRunner executes target/skill runtime and writes results to SESSIONS.md, ENVIRONMENT.md, LOG.md, and artifacts
 ```
 
-When debugging, distinguish: action generation issue / Critic rejection / Watchdog execution failure / execution succeeded but state not written back.
+When debugging, distinguish: task generation issue / target or skillruntime mismatch / preflight rejection / Watchdog execution failure / execution succeeded but state not written back.
 
 ---
 
@@ -676,7 +650,7 @@ Cloud Agent only generates intent-level session specs. Local Runtime layer execu
 | 1. Pure Python unit tests | Interfaces, config, registration, parsing logic | `pytest tests/test_hal_base_driver.py` |
 | 2. Driver local smoke test | Start Watchdog directly | `python hal/hal_watchdog.py --driver <name>` |
 | 3. Dry-run preflight | Pre-check real plugin or remote runtime | preflight + dry-run |
-| 4. Agent full-pipeline integration | Agent → Critic → ACTION → Watchdog → ENVIRONMENT | `paos agent` + Watchdog |
+| 4. Agent full-pipeline integration | Agent → SESSIONS → Watchdog → runtime target → ENVIRONMENT | `paos agent` + Watchdog |
 
 ### Key Test Files
 
@@ -753,32 +727,16 @@ Split out when BOTH conditions are met:
 | Robot Profiles | `hal/profiles/` |
 | Driver Config Examples | `examples/` |
 | Agent Loop | `PhyAgentOS/agent/loop.py` |
-| EmbodiedActionTool | `PhyAgentOS/agent/tools/embodied.py` |
-| Semantic Navigation Tool | `PhyAgentOS/agent/tools/target_navigation.py` |
+| Agent Context | `PhyAgentOS/agent/context.py` |
+| Agent Skill System | `PhyAgentOS/agent/skills.py` |
 | Config Schema | `PhyAgentOS/config/schema.py` |
-| External Plugins | `hal/plugins.py` |
-| Perception Service | `hal/perception/service.py` |
-| Navigation Engine | `hal/navigation/target_navigation_engine.py` |
-| ROS2 Bridge | `hal/ros2/bridge.py` |
+| Perception Runtime | `PhyAgentOS/runtime/perception/` |
+| Runtime Session System | `PhyAgentOS/runtime/sessions/` |
+| Runtime Watchdog | `PhyAgentOS/runtime/watchdog/` |
+| Skill Runtime | `PhyAgentOS/runtime/skillruntime/` |
 | Skill System | `PhyAgentOS/agent/skills.py` |
 | CLI Entry | `PhyAgentOS/cli/commands.py` |
 | Test Suite | `tests/` |
-
-### Old Module → New Module Mapping (Runtime V2 Refactoring)
-
-| Current Module | New Module | Treatment |
-|---------------|------------|-----------|
-| `hal/base_driver.py` | `runtime/targets/*` + `local_control/*` | Deprecated |
-| `hal/drivers/*` | `runtime/targets/*` | Split and migrated |
-| `hal/hal_watchdog.py` | `runtime/watchdog/supervisor.py` | Rewritten, retains role |
-| `ACTION.md` | `SESSIONS.md` | Session schema replacement |
-| `ROBOTS.md` | `TARGETS.md` | Extended to unified sim+real index |
-| Built-in nav actions | `SemanticNavigationRuntime` | Elevated to SkillRuntime |
-| ReKep grasp plugin | `ReKepRuntime` | Elevated to SkillRuntime |
-| Simulation driver | `SimTarget` | Elevated to RolloutTarget |
-| `ENVIRONMENT.md` | Continues as state bus | Preserved and extended |
-| `EMBODIED.md` | Continues as target profile | Preserved and extended |
-| `LESSONS.md` | Continues as failure experience base | Preserved and extended |
 
 ---
 

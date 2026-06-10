@@ -32,6 +32,7 @@
 
 | Version | Date | Update |
 |:------|:-----|:-------|
+| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | Based on ![v0.2.2](https://img.shields.io/badge/v0.2.2-47A882) — Clean Protocol Files and Docs |
 | ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | Based on ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) — Minecraft pipeline optimization: issue and execute commands from terminal and in-game chat |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | Based on ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) — Minecraft ready: cloud agent connects to user's local server |
 | ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
@@ -93,7 +94,7 @@ Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to exec
 <tr>
   <td>📝</td>
   <td><b>File Protocol Matrix</b></td>
-  <td><code>TARGETS.md</code> · <code>SKILLS.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + external YAML configs</td>
+  <td><code>TARGETS.md</code> · <code>SKILLRUNTIME.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + external YAML configs</td>
 </tr>
 <tr>
   <td>🔐</td>
@@ -168,12 +169,36 @@ conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_s
 </table>
 
 `paos agent` and `paos gateway` create the runtime workspace and start the
-session watchdog automatically. Runtime targets are declared in `TARGETS.md`;
-the Agent queues work by appending sessions to `SESSIONS.md`.
+session watchdog automatically when runtime is enabled in config. Runtime
+targets are declared in `TARGETS.md`, executable runtimes in `SKILLRUNTIME.md`,
+and the Agent queues work by appending sessions to `SESSIONS.md`.
 
 ```bash
 paos agent -m "run the configured LIBERO benchmark task"
 ```
+
+---
+
+## 🗂️ Protocol Files
+
+| Context Loading | File | Owner | Purpose |
+|:--|:--|:--|:--|
+| Always loaded into the agent system prompt | `AGENTS.md` | Agent workspace | Project-level operating rules for the agent |
+| Always loaded into the agent system prompt | `SOUL.md` | Agent workspace | Identity, high-level behavior, and assistant style |
+| Always loaded into the agent system prompt | `USER.md` | Agent workspace | User preferences and durable profile notes |
+| Always loaded into the agent system prompt | `TOOLS.md` | Agent workspace | Tool usage policy and available tool guidance |
+| Always loaded into the agent system prompt | `SKILLS.md` | Agent workspace | Agent-facing skill discovery and loading rules |
+| Loaded when present; filtered by enabled runtime targets where applicable | `EMBODIED.md` | Agent workspace | Human-readable target capability descriptions |
+| Loaded when present as state, not bootstrap policy | `ENVIRONMENT.md` | Agent/runtime workspace | Current target and scene/environment state |
+| Loaded when present as memory/state | `LESSONS.md` | Agent workspace | Operational lessons and failure notes |
+| Loaded when present as task state | `TASK.md` | Agent workspace | Multi-step task decomposition and progress |
+| Runtime protocol; read before scheduling sessions | `RUNTIME.md` | Runtime workspace | Instructions for writing valid runtime sessions |
+| Runtime protocol; read before scheduling sessions | `TARGETS.md` | Runtime workspace | Enabled targets, endpoint/adapter/config references, supported skill runtimes |
+| Runtime protocol; read before scheduling sessions | `SKILLRUNTIME.md` | Runtime workspace | Policy/builtin skill runtime registry and execution contracts |
+| Runtime queue/state; written by Agent and watchdog | `SESSIONS.md` | Runtime workspace | Pending/running/completed execution sessions and results |
+
+`SKILLS.md` is for agent capabilities and skill discovery. `SKILLRUNTIME.md` is
+for runtime execution contracts; it is paired with `TARGETS.md` and `SESSIONS.md`.
 
 ---
 
@@ -189,7 +214,7 @@ PhyAgentOS/
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
-│   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
+│   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
 │   │   ├── libero/            #   LIBERO target adapter
 │   │   └── openpi/            #   OpenPI policy adapters
@@ -200,7 +225,7 @@ PhyAgentOS/
 │
 ├── configs/runtime/           # Sensor / Perception / Contract YAML
 ├── scripts/                   # Utility scripts
-├── workspace/                 # Runtime workspace
+├── workspace/                 # Agent workspace; runtime files may share it by config
 ├── docs/                      # Documentation
 └── tests/                     # Tests
 ```

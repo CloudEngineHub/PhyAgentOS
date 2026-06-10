@@ -14,7 +14,7 @@ payloads.
 
 ## Runtime IDs
 
-`SKILLS.md` should use:
+`SKILLRUNTIME.md` should use:
 
 ```text
 policy_adapter://openpi_pi05_adapter

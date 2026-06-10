@@ -79,7 +79,7 @@ def make_response(request: Dict[str, Any], response_type: str, payload: Dict[str
             "type": response_type,
             "session_id": request.get("session_id"),
             "target_id": request.get("target_id"),
-            "skill_id": request.get("skill_id"),
+            "skillruntime_id": request.get("skillruntime_id"),
             "episode_id": request.get("episode_id"),
             "seq": int(request.get("seq", 0)),
             "timestamp_ns": time.time_ns(),

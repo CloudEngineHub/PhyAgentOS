@@ -63,14 +63,14 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 在 PhyAgentOS 中，下列文件通常比类图更重要：
 
 - `TARGETS.md`
-- `SKILLS.md`
+- `SKILLRUNTIME.md`
 - `SESSIONS.md`
 - `ENVIRONMENT.md`
 - `LESSONS.md`
 - `TASK.md`
 - `ORCHESTRATOR.md`
 
-`EMBODIED.md` / `ACTION.md` 仍用于部分 legacy HAL driver 流程；当前 session-centered runtime 的正式执行入口是 `SESSIONS.md`。
+`EMBODIED.md` 面向 Agent 提供 target 能力描述；当前 session-centered runtime 的正式执行入口是 `SESSIONS.md`。
 
 它们共同构成运行时“真实状态面”。如果你只看代码、不看这些文件，很容易误解系统是怎么工作的。文件职责详见 [COMMUNICATION.md](COMMUNICATION.md) 与本文第 4、7 章。
 
@@ -123,7 +123,7 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
 | [../PhyAgentOS/runtime/sessions](../../PhyAgentOS/runtime/sessions) | SessionRunner / TargetSessionHandle |
 | [../PhyAgentOS/runtime/targets](../../PhyAgentOS/runtime/targets) | target runtime 与远端 proxy |
 | [../PhyAgentOS/runtime/targets/remote/libero](../../PhyAgentOS/runtime/targets/remote/libero) | LIBERO benchmark TargetWS server + proxy |
-| [../PhyAgentOS/runtime/skills](../../PhyAgentOS/runtime/skills) | PolicySkillRuntime / BuiltinSkillRuntime |
+| [../PhyAgentOS/runtime/skillruntime](../../PhyAgentOS/runtime/skillruntime) | PolicySkillRuntime / BuiltinSkillRuntime |
 | [../PhyAgentOS/runtime/adapters](../../PhyAgentOS/runtime/adapters) | TargetAdapter / PolicyAdapter / ActionBridge |
 | [../PhyAgentOS/runtime/policy/openpi](../../PhyAgentOS/runtime/policy/openpi) | OpenPI client 与 LeRobot pi0-family policy server |
 | [../hal](../../hal) | Legacy HAL driver 代码，保留给旧驱动与特定真机插件流程 |
@@ -142,7 +142,7 @@ PhyAgentOS 的核心价值不只是“有一个 Agent”，而是将认知层与
    - 某类机器人的静态能力声明
    - 例如 [../hal/profiles/go2_edu.md](../../hal/profiles/go2_edu.md)、[../hal/profiles/simulation.md](../../hal/profiles/simulation.md)
 3. **运行时文件（workspace / workspaces）**
-   - 真正被 Agent、Critic、Watchdog 读写的状态面
+   - 真正被 Agent、Watchdog 与 runtime writer 读写的状态面
    - 例如实际运行中的 `EMBODIED.md`、`ENVIRONMENT.md`
 
 简而言之：**模板定义结构，Profile 提供实例类型说明，运行时文件承载真实状态。**
@@ -216,9 +216,9 @@ paos onboard
 一个开发者应当掌握如下生命周期：
 
 1. `paos onboard` 准备模板/目录
-2. `paos agent` / `paos gateway` 启动时自动创建 runtime workspace，并启动 session watchdog
+2. 当 config 启用 runtime 时，`paos agent` / `paos gateway` 启动时自动创建 runtime workspace，并启动 session watchdog
 3. `RuntimeWorkspaceManager` 写入当前启用 target 的 `ENVIRONMENT.md` 快照
-4. Agent 根据 `TARGETS.md`、`SKILLS.md`、`ENVIRONMENT.md` 等状态规划
+4. Agent 根据 `TARGETS.md`、`SKILLRUNTIME.md`、`ENVIRONMENT.md` 等状态规划
 5. Agent 将可执行任务追加到 `SESSIONS.md`
 6. WatchdogSupervisor claim pending session，执行 compatibility preflight
 7. SessionRunner 通过 TargetSessionHandle 运行 target/skill，并写回 artifact、session result 与环境状态
@@ -253,10 +253,10 @@ paos gateway
 
 ### 5.2 Runtime Watchdog 是如何工作的
 
-当前 runtime 入口由 `paos agent` / `paos gateway` 启动时自动创建。开发者通常不需要手动启动 watchdog；它围绕 runtime workspace 中的协议文件工作：
+当前 runtime 入口由 `paos agent` / `paos gateway` 在 config 启用 runtime 时自动创建。开发者通常不需要手动启动 watchdog；它围绕 runtime workspace 中的协议文件工作：
 
 - `TARGETS.md`：target registry 与 endpoint/adapter/contract
-- `SKILLS.md`：可执行 skill runtime
+- `SKILLRUNTIME.md`：可执行 skill runtime
 - `SESSIONS.md`：pending session 队列与结果
 - `ENVIRONMENT.md`：runtime/perception 写回的环境状态
 
@@ -305,10 +305,11 @@ python hal/hal_watchdog.py \
 
 - Watchdog 终端输出
 - Agent 终端输出
-- `ACTION.md`
+- `SESSIONS.md`
+- `TARGETS.md`
+- `SKILLRUNTIME.md`
 - `ENVIRONMENT.md`
 - `LESSONS.md`
-- Fleet 模式下的 `ROBOTS.md`
 
 ## 6. HAL 驱动开发与内置驱动扩展
 
@@ -384,64 +385,63 @@ python hal/hal_watchdog.py \
 - [../examples/go2_driver_config.json](../../examples/go2_driver_config.json)
 - [../examples/xlerobot_2wheels_remote.driver.json](../../examples/xlerobot_2wheels_remote.driver.json)
 
-## 7. 动作校验、分发与运行时文件流转
+## 7. Session 校验、分发与运行时文件流转
 
-### 7.1 具身动作并不是“直接执行”
+### 7.1 Runtime 任务并不是“直接执行”
 
-在 PhyAgentOS 里，动作通常要经过下面的路径：
+在 PhyAgentOS 里，可执行任务通常要经过下面的路径：
 
-1. Agent 形成动作意图
-2. `EmbodiedActionTool` 做 Critic 校验
-3. 校验通过后写入目标 `ACTION.md`
-4. Watchdog 消费动作并执行
-5. 结果被回写到环境状态文件
+1. Agent 形成任务意图
+2. Agent 读取 `TARGETS.md` 与 `SKILLRUNTIME.md`，选择 enabled target 与兼容 skill runtime
+3. Agent 向 `SESSIONS.md` 追加 `pending` session
+4. Watchdog claim session，执行 preflight
+5. `SessionRunner` 启动 target/runtime，结果与 artifact 写回 `SESSIONS.md`
+6. Runtime/perception 写回 `ENVIRONMENT.md`
 
 因此，问题排查时要区分：
 
-- 是**动作生成有问题**
-- 还是**Critic 校验拒绝**
+- 是**任务生成或 target/skillruntime 选择有问题**
+- 还是**preflight 校验拒绝**
 - 还是**Watchdog 执行失败**
 - 还是**执行成功但环境未回写**
 
-### 7.2 `EmbodiedActionTool` 的职责
+### 7.2 Runtime preflight 的职责
 
-核心逻辑位于 [../PhyAgentOS/agent/tools/embodied.py](../../PhyAgentOS/agent/tools/embodied.py)。开发者应关注它的几个关键职责：
+核心逻辑位于 [../PhyAgentOS/runtime/preflight](../../PhyAgentOS/runtime/preflight)。开发者应关注几个关键职责：
 
-- 在 fleet 模式下解析目标 `robot_id`
-- 为目标机器人定位 `EMBODIED.md`、`ENVIRONMENT.md`、`ACTION.md`
-- 把动作草案、环境状态、能力声明交给 Critic
-- 校验通过时写入 `ACTION.md`
-- 校验失败时记录到 `LESSONS.md`
+- 解析 session 中的 `target_ref` 与 `skillruntime_ref`
+- 校验 target 是否启用、是否支持该 skill runtime
+- 校验 target kind、observation contract、action contract 是否兼容
+- 校验 sensor/perception/runtime contract 与 adapter/bridge 配置
+- 不合法时将 session 标记为 rejected，并写回可诊断原因
 
-这也是为什么 profile 与环境文件的表达质量会直接影响系统表现。
+这也是为什么 `TARGETS.md`、`SKILLRUNTIME.md`、runtime contract 与环境文件的表达质量会直接影响系统表现。
 
-### 7.3 `ACTION.md` 的协议约定
+### 7.3 `SESSIONS.md` 的协议约定
 
-Watchdog 默认从 `ACTION.md` 中提取第一个 JSON 代码块。最小格式通常类似：
+Watchdog 从 `SESSIONS.md` 的 YAML block 中读取 pending session。最小格式通常类似：
 
-```json
-{
-  "action_type": "move_to",
-  "parameters": {
-    "x": 10,
-    "y": 20,
-    "z": 5
-  },
-  "status": "pending"
-}
+```yaml
+version: runtime_sessions_v1
+sessions:
+  - session_id: sess_example
+    target_ref: target://dummy_sim
+    skillruntime_ref: skillruntime://openpi_sim_vla
+    task_description: run a smoke test
+    status: pending
+    priority: normal
 ```
 
-开发自定义工具或外部插件时，必须保持这一约定，否则 Watchdog 无法解析。
+开发自定义工具或外部插件时，必须保持 `target_ref`、`skillruntime_ref` 与 registry 中的 id 一致，否则 scheduler/preflight 会拒绝 session。
 
-### 7.4 导航类动作的特殊点
+### 7.4 任务类能力的特殊点
 
-目标导航工具位于 [../PhyAgentOS/agent/tools/target_navigation.py](../../PhyAgentOS/agent/tools/target_navigation.py)。它会把更高层的“朝某个目标标签移动”的需求，转换为底层 `target_navigation` 动作并交给 `EmbodiedActionTool`。
+对新的任务类能力进行扩展时，建议同时检查：
 
-对导航类能力进行扩展时，建议同时检查：
-
-- profile 是否声明了该动作
+- `TARGETS.md` 是否声明了目标 target、endpoint、adapter、runtime contract
+- `SKILLRUNTIME.md` 是否声明了兼容的 policy/builtin runtime 与 required outputs
 - `ENVIRONMENT.md` 是否包含必要的目标/地图/状态字段
-- driver 是否在 `get_runtime_state()` 中回写了足够的导航状态
+- runtime target 是否在 observation/status 中回写了足够的可诊断状态
 
 ## 8. 导航、感知与 ROS2 相关模块
 
@@ -530,7 +530,7 @@ python scripts/deploy_rekep_real_plugin.py \
 1. **纯 Python 单测**：接口、配置、注册、解析逻辑
 2. **driver 本地 smoke test**：直接启动 Watchdog
 3. **runtime 层 dry-run**：对真实插件或远程运行时做预检
-4. **Agent 全链路联调**：让 Agent -> Critic -> ACTION -> Watchdog -> ENVIRONMENT 完整走通
+4. **Agent 全链路联调**：让 Agent -> SESSIONS -> Watchdog -> runtime target -> ENVIRONMENT 完整走通
 
 ### 10.2 主仓库中值得参考的测试
 

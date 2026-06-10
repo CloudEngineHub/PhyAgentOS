@@ -9,11 +9,11 @@ from PhyAgentOS.runtime.adapters.factory import build_adapter_stack
 from PhyAgentOS.runtime.perception.config_resolver import ResolvedPerceptionPlan
 from PhyAgentOS.runtime.perception.perception_runtime import PerceptionRuntime
 from PhyAgentOS.runtime.policy.base_client import BasePolicyClient
-from PhyAgentOS.runtime.schemas import AdapterPlan, SessionResult, SessionSpec, SkillSpec, TargetSpec, TargetToolManifest
+from PhyAgentOS.runtime.schemas import AdapterPlan, SessionResult, SessionSpec, SkillRuntimeSpec, TargetSpec, TargetToolManifest
 from PhyAgentOS.runtime.sessions.models import SessionState, SkillContext, SkillRuntimeResult
 from PhyAgentOS.runtime.sessions.target_session_handle import TargetSessionHandle
-from PhyAgentOS.runtime.skills.builtin import BuiltinSkillRuntime
-from PhyAgentOS.runtime.skills.policy import PolicySkillRuntime
+from PhyAgentOS.runtime.skillruntime.builtin import BuiltinSkillRuntime
+from PhyAgentOS.runtime.skillruntime.policy import PolicySkillRuntime
 from PhyAgentOS.runtime.watchdog.errors import PolicyProtocolError
 
 
@@ -23,7 +23,7 @@ class SessionRunner:
         *,
         session: SessionSpec,
         target_spec: TargetSpec,
-        skill_spec: SkillSpec,
+        skillruntime_spec: SkillRuntimeSpec,
         adapter_plan: AdapterPlan,
         target,
         skill_runtime,
@@ -34,7 +34,7 @@ class SessionRunner:
     ):
         self.session = session
         self.target_spec = target_spec
-        self.skill_spec = skill_spec
+        self.skillruntime_spec = skillruntime_spec
         self.adapter_plan = adapter_plan
         self.target = target
         self.skill_runtime = skill_runtime
@@ -60,7 +60,7 @@ class SessionRunner:
         handle = TargetSessionHandle(
             session=self.session,
             target_spec=self.target_spec,
-            skill_spec=self.skill_spec,
+            skillruntime_spec=self.skillruntime_spec,
             target=self.target,
             target_adapter=target_adapter,
             action_bridges=action_bridges,
@@ -74,13 +74,13 @@ class SessionRunner:
         skill_ctx = SkillContext(
             session=self.session,
             target=self.target_spec,
-            skill=self.skill_spec,
+            skillruntime=self.skillruntime_spec,
             task_description=self.session.task_description,
             metadata={"trace_id": self.state.trace_id},
         )
         self.skill_runtime.start(skill_ctx)
         self.state.heartbeat()
-        if self.skill_spec.runtime_kind == "policy":
+        if self.skillruntime_spec.runtime_kind == "policy":
             if self.policy_client is None:
                 raise PolicyProtocolError("policy runtime requires a policy client")
             if not isinstance(self.skill_runtime, PolicySkillRuntime):
@@ -118,7 +118,7 @@ class SessionRunner:
             "session_id": self.session.session_id,
             "task_description": self.session.task_description,
             "target_ref": self.session.target_ref,
-            "skill_ref": self.session.skill_ref,
+            "skillruntime_ref": self.session.skillruntime_ref,
             "adapter_plan": self.adapter_plan.model_dump(mode="json"),
             "execution": self.session.execution.model_dump(mode="json"),
             "safety_profile": self.session.safety_profile.model_dump(mode="json"),

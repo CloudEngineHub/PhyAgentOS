@@ -192,7 +192,7 @@ WatchdogSupervisor does not need to know whether the Target is a game, simulatio
 | **Adapter + Bridge** | `TargetAdapter` + `PolicyAdapter` + `ActionBridge` three-way decoupling, auto-composed |
 | **Dual Skill Runtimes** | `PolicySkillRuntime` maintains policy closed-loop + `BuiltinSkillRuntime` manages agent interactive loop |
 | **Strict Preflight** | 10 validation checks (target / sensor / perception / contract / tool); rejected before execution |
-| **File Protocol Matrix** | `TARGETS.md` · `SKILLS.md` · `SESSIONS.md` · `ENVIRONMENT.md` · `LESSONS.md` |
+| **File Protocol Matrix** | `TARGETS.md` · `SKILLRUNTIME.md` · `SESSIONS.md` · `ENVIRONMENT.md` · `LESSONS.md` |
 | **Multi-Layer Safety** | Critic validation → Preflight contract checks → Target-side SafetyGuard → Operator Override |
 | **Fleet Mode** | Multi-robot coordination, shared + per-robot workspaces, priority-based serial scheduling |
 | **Perception Plugin System** | `SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` auditable writeback |
@@ -231,7 +231,7 @@ WatchdogSupervisor does not need to know whether the Target is a game, simulatio
 
 ### Current Architecture (v0.2.1, Driver-Centered HAL)
 
-Current Track B is centered on `BaseDriver`: observe / execute / profile / safety coupled in one subclass. Track A and Track B communicate via `ACTION.md` (atomic action queue).
+Current Track B is centered on sessions: `WatchdogSupervisor` monitors session state, `SessionRunner` owns target lifecycle, and `TargetSessionHandle` exposes targets to policy or builtin skill runtimes. Track A and Track B communicate through `TARGETS.md`, `SKILLRUNTIME.md`, `SESSIONS.md`, and runtime state files.
 
 ### Refactoring Target (Session-Centered Runtime)
 
@@ -241,8 +241,8 @@ Documents in `plans/` (not ordinary plans, but architecture specifications) defi
 |------------|------------|------|
 | `BaseDriver` | `RolloutTarget` + `SkillRuntime` + `TargetAdapter` | Split into three first-class objects |
 | `hal_watchdog.py` | `WatchdogSupervisor` | Upgraded from action poller to execution session supervisor |
-| `ACTION.md` | `SESSIONS.md` | Session schema replaces action schema |
-| `ROBOTS.md` | `TARGETS.md` | Extended to unified sim+real index |
+| Per-action queue | `SESSIONS.md` | Session schema is the execution queue |
+| Robot-only index | `TARGETS.md` | Unified sim/game/real target registry |
 | Navigation/ReKep as driver-internal functions | `SkillRuntime` (BuiltinAlgorithmSkillRuntime) | Elevated to first-class skill runtime |
 | Simulation driver | `SimTarget` | Elevated to first-class rollout target |
 
@@ -454,7 +454,7 @@ PhyAgentOS/
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
-│   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
+│   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
 │   ├── perception/            #   Perception Runtime / EnvironmentWriter
 │   ├── preflight/             #   RuntimeCompatibilityPreflight

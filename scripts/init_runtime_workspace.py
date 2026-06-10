@@ -18,7 +18,6 @@ from PhyAgentOS.runtime.workspace.manager import (
     RuntimeWorkspaceManager,
 )
 from PhyAgentOS.config.schema import Config
-from PhyAgentOS.runtime.state_io.markdown_yaml import write_yaml_block
 
 
 def init_runtime_workspace(workspace: Path, force: bool = False) -> dict[str, list[str]]:
@@ -28,7 +27,7 @@ def init_runtime_workspace(workspace: Path, force: bool = False) -> dict[str, li
     templates = pkg_files("PhyAgentOS") / "templates"
 
     result: dict[str, list[str]] = {"created": [], "skipped": [], "overwritten": []}
-    for name in RUNTIME_TEMPLATE_NAMES:
+    for name in (*RUNTIME_TEMPLATE_NAMES, "SESSIONS.md"):
         src = templates / name
         dest = workspace / name
         if dest.exists() and not force:
@@ -48,17 +47,6 @@ def init_runtime_workspace(workspace: Path, force: bool = False) -> dict[str, li
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         result["overwritten" if existed else "created"].append(name)
-    sessions_path = workspace / "SESSIONS.md"
-    if sessions_path.exists() and not force:
-        result["skipped"].append("SESSIONS.md")
-    else:
-        existed = sessions_path.exists()
-        write_yaml_block(
-            sessions_path,
-            "Runtime Sessions",
-            {"version": "runtime_sessions_v1", "sessions": []},
-        )
-        result["overwritten" if existed else "created"].append("SESSIONS.md")
     cfg = Config()
     cfg.runtime.workspace = str(workspace)
     cfg.runtime.autostart_watchdog = False

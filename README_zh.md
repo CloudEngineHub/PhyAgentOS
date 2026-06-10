@@ -32,6 +32,7 @@
 README_zh.md
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
+| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | 基于 ![v0.2.2](https://img.shields.io/badge/v0.2.2-47A882) 清理了协议文件以及文档 |
 | ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | 基于 ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) 的MineCraft通路优化，可以在终端和游戏内下达指令并执行 |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | 基于 ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) 的MineCraft 就绪，以云端agent接入用户的本地服务器 |
 | ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
@@ -93,7 +94,7 @@ README_zh.md
 <tr>
   <td>📝</td>
   <td><b>文件协议矩阵</b></td>
-  <td><code>TARGETS.md</code> · <code>SKILLS.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + 外部 YAML</td>
+  <td><code>TARGETS.md</code> · <code>SKILLRUNTIME.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + 外部 YAML</td>
 </tr>
 <tr>
   <td>🔐</td>
@@ -167,13 +168,37 @@ conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_s
 </tr>
 </table>
 
-`paos agent` 和 `paos gateway` 会自动创建 runtime workspace，并启动
-session watchdog。Runtime target 由 `TARGETS.md` 声明；Agent 通过向
+当 config 启用 runtime 时，`paos agent` 和 `paos gateway` 会自动创建
+runtime workspace，并启动 session watchdog。Runtime target 由
+`TARGETS.md` 声明，可执行运行时由 `SKILLRUNTIME.md` 声明；Agent 通过向
 `SESSIONS.md` 追加 session 来排队执行任务。
 
 ```bash
 paos agent -m "运行已配置的 LIBERO benchmark 任务"
 ```
+
+---
+
+## 🗂️ 协议文件
+
+| 进入上下文逻辑 | 文件 | 所属工作区 | 功能 |
+|:--|:--|:--|:--|
+| 始终进入 agent system prompt | `AGENTS.md` | Agent workspace | Agent 的项目级运行规则 |
+| 始终进入 agent system prompt | `SOUL.md` | Agent workspace | 身份、行为边界与助手风格 |
+| 始终进入 agent system prompt | `USER.md` | Agent workspace | 用户偏好与长期画像 |
+| 始终进入 agent system prompt | `TOOLS.md` | Agent workspace | 工具使用规则与可用工具说明 |
+| 始终进入 agent system prompt | `SKILLS.md` | Agent workspace | 面向 Agent 的 skill 发现与加载规则 |
+| 存在时进入上下文；涉及 target 时按启用 target 过滤 | `EMBODIED.md` | Agent workspace | Target 能力的人类可读描述 |
+| 存在时作为状态进入上下文，不是 bootstrap 规则 | `ENVIRONMENT.md` | Agent/runtime workspace | 当前 target、场景与环境状态 |
+| 存在时作为记忆/状态进入上下文 | `LESSONS.md` | Agent workspace | 运行经验、失败记录与修正建议 |
+| 存在时作为任务状态进入上下文 | `TASK.md` | Agent workspace | 多步任务拆解与进度 |
+| Runtime 协议；创建 session 前读取 | `RUNTIME.md` | Runtime workspace | 写入合法 runtime session 的说明 |
+| Runtime 协议；创建 session 前读取 | `TARGETS.md` | Runtime workspace | 已启用 target、endpoint/adapter/config 引用、支持的 skill runtime |
+| Runtime 协议；创建 session 前读取 | `SKILLRUNTIME.md` | Runtime workspace | Policy/builtin skill runtime 注册表与执行契约 |
+| Runtime 队列/状态；Agent 与 watchdog 写入 | `SESSIONS.md` | Runtime workspace | 待执行、执行中、已完成 session 与结果 |
+
+`SKILLS.md` 服务 Agent 能力与 skill 发现；`SKILLRUNTIME.md` 服务 runtime
+执行契约，并与 `TARGETS.md`、`SESSIONS.md` 配套使用。
 
 ---
 
@@ -189,7 +214,7 @@ PhyAgentOS/
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
-│   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
+│   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
 │   │   ├── libero/            #   LIBERO target adapter
 │   │   └── openpi/            #   OpenPI policy adapters
@@ -200,7 +225,7 @@ PhyAgentOS/
 │
 ├── configs/runtime/           # Sensor / Perception / Contract YAML
 ├── scripts/                   # 工具脚本
-├── workspace/                 # 运行时工作区
+├── workspace/                 # Agent 工作区；runtime 文件可按配置共用该目录
 ├── docs/                      # 文档
 └── tests/                     # 测试
 ```

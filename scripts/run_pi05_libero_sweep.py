@@ -26,9 +26,9 @@ os.environ.setdefault("NO_PROXY", "*")
 from PhyAgentOS.runtime.communication.target_ws_client import TargetWSClient
 from PhyAgentOS.runtime.artifacts.episode_writer import EpisodeWriter
 from PhyAgentOS.runtime.policy.factory import build_policy_client
-from PhyAgentOS.runtime.schemas import AdapterPlan, SessionSpec, SkillSpec, TargetSpec
+from PhyAgentOS.runtime.schemas import AdapterPlan, SessionSpec, SkillRuntimeSpec, TargetSpec
 from PhyAgentOS.runtime.sessions.session_runner import SessionRunner
-from PhyAgentOS.runtime.skills.policy import OpenPISkillRuntime
+from PhyAgentOS.runtime.skillruntime.policy import OpenPISkillRuntime
 from PhyAgentOS.runtime.targets.remote.libero.proxy import LiberoRemoteTargetProxy
 
 DEFAULT_POLICY_ENDPOINT = "openpi://127.0.0.1:8000"
@@ -82,7 +82,7 @@ def run_one(args, task_id: int, init_id: int):
         {
             "session_id": f"sweep_t{task_id}_i{init_id}",
             "target_ref": "target://libero_real_remote",
-            "skill_ref": "skill://pi05_libero_remote",
+            "skillruntime_ref": "skillruntime://pi05_libero_remote",
             "task_description": "libero task",
             "routing": {"policy_endpoint": args.policy_endpoint, "target_endpoint": args.target_endpoint},
             "execution": {
@@ -98,7 +98,7 @@ def run_one(args, task_id: int, init_id: int):
             "target_class": "remote",
             "target_kind": "simulation",
             "workspace": "workspaces/libero_real",
-            "supported_skills": ["pi05_libero_remote"],
+            "supported_skillruntimes": ["pi05_libero_remote"],
             "runtime": {
                 "target_runtime": "LiberoRemoteTargetProxy",
                 "target_endpoint": args.target_endpoint,
@@ -111,7 +111,7 @@ def run_one(args, task_id: int, init_id: int):
     result = SessionRunner(
         session=session,
         target_spec=target_spec,
-        skill_spec=SkillSpec.model_validate(_SKILL_SPEC),
+        skillruntime_spec=SkillRuntimeSpec.model_validate(_SKILL_SPEC),
         adapter_plan=AdapterPlan(
             target_adapter="target_adapter://libero_adapter",
             policy_adapter="policy_adapter://openpi_pi05_adapter",

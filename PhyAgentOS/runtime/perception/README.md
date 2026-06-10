@@ -10,7 +10,7 @@ Runtime protocol files live in the runtime workspace:
 
 ```text
 TARGETS.md
-SKILLS.md
+SKILLRUNTIME.md
 SESSIONS.md
 LOG.md
 configs/runtime/sensors/<target_id>.sensors.yaml
@@ -35,7 +35,7 @@ python scripts/run_runtime_watchdog.py \
   --environment-workspace /path/to/shared_agent_workspace
 ```
 
-`--workspace` is used for `TARGETS.md`, `SKILLS.md`, `SESSIONS.md`, config YAML files, runtime artifacts, and `LOG.md`.
+`--workspace` is used for `TARGETS.md`, `SKILLRUNTIME.md`, `SESSIONS.md`, config YAML files, runtime artifacts, and `LOG.md`.
 
 `--environment-workspace` is where perception writes `ENVIRONMENT.md`. This should be the workspace read by the upper-level Agent.
 
@@ -55,7 +55,7 @@ targets:
     target_kind: real_robot
     enabled: true
     workspace: workspaces/franka_lab_a
-    supported_skills:
+    supported_skillruntimes:
       - rekep_grasp
       - openpi_pick_place
     runtime:
@@ -84,7 +84,7 @@ Important rules:
 - Adapter identifiers must use explicit URI namespaces such as `target_adapter://franka_real_adapter`.
 - Remote target endpoints use the runtime RPC envelope over `targetws://`; responses are matched to requests by message type, sequence number, session id, target id, and skill id.
 
-### SKILLS.md
+### SKILLRUNTIME.md
 
 Skills declare what they need, not which plugin or model should satisfy it.
 
@@ -92,7 +92,7 @@ Example:
 
 ```yaml
 version: runtime_skill_registry_v1
-skills:
+skillruntimes:
   - id: rekep_grasp
     runtime: ReKepBuiltinSkillRuntime
     runtime_kind: builtin
@@ -147,7 +147,7 @@ version: runtime_sessions_v1
 sessions:
   - session_id: sess_pick_apple_001
     target_ref: target://franka_lab_a
-    skill_ref: skill://rekep_grasp
+    skillruntime_ref: skillruntime://rekep_grasp
     task_description: "pick up the red apple on the table"
     status: pending
     routing:
@@ -562,7 +562,7 @@ configs/runtime/perception/dummy_sim.perception.yaml
 By default `dummy_sim` has `perception.enabled: false` and the default skill has no perception requirements. To exercise perception:
 
 1. Set `TARGETS.md` `targets[dummy_sim].perception.enabled: true`.
-2. Add required sensors and outputs to `SKILLS.md`, for example:
+2. Add required sensors and outputs to `SKILLRUNTIME.md`, for example:
 
 ```yaml
 requires:

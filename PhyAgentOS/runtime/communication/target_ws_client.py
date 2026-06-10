@@ -54,7 +54,7 @@ class TargetWSClient:
         payload: dict[str, Any] | None = None,
         *,
         session_id: str | None = None,
-        skill_id: str | None = None,
+        skillruntime_id: str | None = None,
         episode_id: str | None = None,
         trace_id: str | None = None,
         expected_response_type: str | None = None,
@@ -65,7 +65,7 @@ class TargetWSClient:
             type=message_type,
             session_id=session_id,
             target_id=self.target_id,
-            skill_id=skill_id,
+            skillruntime_id=skillruntime_id,
             episode_id=episode_id,
             seq=self._seq,
             timestamp_ns=time.time_ns(),
@@ -92,8 +92,8 @@ class TargetWSClient:
             mismatches.append(f"session_id {response.session_id!r} != {request.session_id!r}")
         if response.target_id != request.target_id:
             mismatches.append(f"target_id {response.target_id!r} != {request.target_id!r}")
-        if response.skill_id != request.skill_id:
-            mismatches.append(f"skill_id {response.skill_id!r} != {request.skill_id!r}")
+        if response.skillruntime_id != request.skillruntime_id:
+            mismatches.append(f"skillruntime_id {response.skillruntime_id!r} != {request.skillruntime_id!r}")
         if mismatches:
             raise TargetProtocolError(
                 f"target RPC {message_type} returned mismatched response: {', '.join(mismatches)}"

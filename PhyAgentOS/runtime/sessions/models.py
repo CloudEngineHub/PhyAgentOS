@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from PhyAgentOS.runtime.schemas import SessionResult, SessionSpec, SkillSpec, TargetSpec
+from PhyAgentOS.runtime.schemas import SessionResult, SessionSpec, SkillRuntimeSpec, TargetSpec
 
 
 @dataclass
@@ -55,7 +55,7 @@ class SessionState:
 class SkillContext:
     session: SessionSpec
     target: TargetSpec
-    skill: SkillSpec
+    skillruntime: SkillRuntimeSpec
     task_description: str
     metadata: dict[str, Any] = field(default_factory=dict)
 

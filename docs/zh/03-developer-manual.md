@@ -76,12 +76,12 @@ PhyAgentOS 的核心价值是将认知层与执行层通过显式协议解耦。
 | 文件 | 逻辑含义 |
 |------|---------|
 | `TARGETS.md` | target registry 与 endpoint / adapter / contract |
-| `SKILLS.md` | 可执行 skill runtime 声明 |
+| `SKILLRUNTIME.md` | 可执行 skill runtime 声明 |
+| `SESSIONS.md` | 执行意图与结果真相 |
 | `ENVIRONMENT.md` | 环境状态真相 |
-| `SESSIONS.md` | 执行意图真相 |
+| `EMBODIED.md` | 面向 Agent 的 target 能力描述 |
+| `SKILLS.md` | 面向 Agent 的 skill 发现与加载规则 |
 | `LESSONS.md` | 失败经验真相 |
-
-`EMBODIED.md` / `ACTION.md` 仍用于部分 legacy HAL driver 流程；session-centered runtime 的正式执行入口是 `SESSIONS.md`。
 
 **只看代码不看文件会误解系统行为。**
 
@@ -98,7 +98,7 @@ PhyAgentOS 的核心价值是将认知层与执行层通过显式协议解耦。
 |------|------|------|
 | **模板（templates）** | `PhyAgentOS/templates/` | 定义文件结构与建议字段 |
 | **Profile** | `hal/profiles/` | 某类机器人的静态能力声明 |
-| **运行时文件** | workspace/ | 真正被 Agent/Critic/Watchdog 读写的状态面 |
+| **运行时文件** | workspace/ | 真正被 Agent、Watchdog 与 runtime writer 读写的状态面 |
 
 简而言之：**模板定义结构，Profile 提供实例类型说明，运行时文件承载真实状态。**
 
@@ -208,7 +208,7 @@ class CompositeTarget(BaseRolloutTarget):  # Go2 + Franka
 
 ### 3.3.3 BaseSkillRuntime 接口
 
-**位置**：`PhyAgentOS/runtime/skills/base.py`（新版）
+**位置**：`PhyAgentOS/runtime/skillruntime/base.py`（新版）
 
 ```python
 class BaseSkillRuntime(ABC):
@@ -303,30 +303,17 @@ class AgentLoop:
 ```
 
 工作流：
-1. 从工作区文件构建上下文（TARGETS.md、SKILLS.md、SESSIONS.md、ENVIRONMENT.md、LESSONS.md）
+1. 从 bootstrap 文件（`AGENTS.md`、`SOUL.md`、`USER.md`、`TOOLS.md`、`SKILLS.md`）以及 `ENVIRONMENT.md`、`EMBODIED.md`、`LESSONS.md` 等状态文件构建上下文
 2. 调用 LLM 进行规划和推理
-3. 处理工具调用（EmbodiedActionTool、SemanticNavigationTool 等）
-4. 将可执行任务写入 `SESSIONS.md`
+3. 处理工具调用与 skill 引导的工作流
+4. 需要 runtime 执行时，读取 `TARGETS.md` / `SKILLRUNTIME.md` 并将任务追加到 `SESSIONS.md`
 5. 管理对话历史
 
-#### Critic 校验框架
+#### Runtime Session 校验
 
-**位置**：`PhyAgentOS/agent/tools/embodied.py`
+**位置**：`PhyAgentOS/runtime/preflight/`
 
-EmbodiedActionTool 的职责：
-- 在 fleet 模式下解析目标 `robot_id`
-- 为目标机器人定位 runtime workspace 和环境状态
-- 把动作草案、环境状态、能力声明交给 Critic
-- 校验通过时写入 `SESSIONS.md`
-- 校验失败时记录到 `LESSONS.md`
-
-新版 Critic 还校验：
-1. 目标 target 是否可用
-2. 该 target 是否支持该 skill
-3. 该 skill 是否满足输入前提
-4. 该会话是否越过安全边界
-5. 该任务应落到 sim 还是 real
-6. fallback chain 是否存在
+Runtime 执行前会解析 session 中的 `target_ref` 与 `skillruntime_ref`，检查 target 是否支持对应 skill runtime，校验 sensor、perception、runtime contract 与 adapter/bridge 兼容性，不合法的 session 会在 target 或 policy runtime 启动前被拒绝。
 
 #### Skill 系统
 
@@ -376,48 +363,30 @@ class Config(BaseModel):
 
 ### 3.3.8 文件协议约定
 
-#### ACTION.md 格式
+#### SESSIONS.md 格式
 
-Watchdog 默认从 `ACTION.md` 中提取第一个 JSON 代码块：
-
-```json
-{
-  "action_type": "move_to",
-  "parameters": {
-    "x": 10,
-    "y": 20,
-    "z": 5
-  },
-  "status": "pending"
-}
+```yaml
+version: runtime_sessions_v1
+sessions:
+  - session_id: sess_example
+    target_ref: target://dummy_sim
+    skillruntime_ref: skillruntime://openpi_sim_vla
+    task_description: run a smoke test
+    status: pending
+    priority: normal
 ```
 
-开发自定义工具或外部插件时，必须保持这一约定，否则 Watchdog 无法解析。
-
-#### SESSIONS.md 格式（新版协议）
-
-```json
-{
-  "session_id": "uuid",
-  "goal": "pick up the red cube",
-  "target": "simulation://default",
-  "skill": "vla_pick",
-  "params": {"object": "red_cube"},
-  "status": "pending"
-}
-```
-
-#### 动作校验-分发-执行链路
+#### Session 校验-分发-执行链路
 
 ```
-1. Agent 形成动作意图
-2. EmbodiedActionTool 做 Critic 校验
-3. 校验通过后写入 `SESSIONS.md`
+1. Agent 形成任务意图
+2. Agent 从 TARGETS.md / SKILLRUNTIME.md 解析 target 与 skill runtime
+3. Agent 向 SESSIONS.md 追加 pending session
 4. WatchdogSupervisor claim session，执行 preflight
-5. SessionRunner 运行 target/skill，结果回写到 `ENVIRONMENT.md` / `LESSONS.md` / artifacts
+5. SessionRunner 运行 target/skill runtime，结果回写到 SESSIONS.md、ENVIRONMENT.md、LOG.md 与 artifacts
 ```
 
-排查时要区分：动作生成有问题 / Critic 校验拒绝 / Watchdog 执行失败 / 执行成功但环境未回写。
+排查时要区分：任务生成有问题 / target 或 skillruntime 不匹配 / preflight 拒绝 / Watchdog 执行失败 / 执行成功但环境未回写。
 
 ---
 
@@ -752,37 +721,15 @@ protocol 单测 → preflight → 远程 target/policy server 验收 → Agent �
 | Session Runner | `PhyAgentOS/runtime/sessions/` |
 | Target Runtime | `PhyAgentOS/runtime/targets/` |
 | LIBERO TargetWS | `PhyAgentOS/runtime/targets/remote/libero/` |
-| Skill Runtime | `PhyAgentOS/runtime/skills/` |
+| Skill Runtime | `PhyAgentOS/runtime/skillruntime/` |
 | Target/Policy Adapter | `PhyAgentOS/runtime/adapters/` |
 | OpenPI Policy Client/Server | `PhyAgentOS/runtime/policy/openpi/` |
 | Agent Loop | `PhyAgentOS/agent/loop.py` |
-| EmbodiedActionTool | `PhyAgentOS/agent/tools/embodied.py` |
-| 语义导航工具 | `PhyAgentOS/agent/tools/target_navigation.py` |
+| Agent Context | `PhyAgentOS/agent/context.py` |
+| Agent Skill 系统 | `PhyAgentOS/agent/skills.py` |
 | 配置 Schema | `PhyAgentOS/config/schema.py` |
-| 外部插件 | `hal/plugins.py` |
-| 感知服务 | `hal/perception/service.py` |
-| 导航引擎 | `hal/navigation/target_navigation_engine.py` |
-| ROS2 桥接 | `hal/ros2/bridge.py` |
-| Skill 系统 | `PhyAgentOS/agent/skills.py` |
 | CLI 入口 | `PhyAgentOS/cli/commands.py` |
 | 测试套件 | `tests/` |
-| Legacy HAL Driver | `hal/` |
-
-### 旧模块 → 新模块映射（Runtime V2 重构）
-
-| 当前模块 | 新模块 | 处理方式 |
-|---------|--------|---------|
-| `hal/base_driver.py` | `runtime/targets/*` + `local_control/*` | 废弃 |
-| `hal/drivers/*` | `runtime/targets/*` | 拆分迁移 |
-| `hal/hal_watchdog.py` | `runtime/watchdog/supervisor.py` | 重写保留角色 |
-| `ACTION.md` | `SESSIONS.md` | Session schema 替换 |
-| `ROBOTS.md` | `TARGETS.md` | 扩展为 sim+real 统一索引 |
-| 内置导航动作 | `SemanticNavigationRuntime` | 提升为 SkillRuntime |
-| ReKep 抓取插件 | `ReKepRuntime` | 提升为 SkillRuntime |
-| 仿真 driver | `SimTarget` | 提升为 RolloutTarget |
-| `ENVIRONMENT.md` | 继续作为状态总线 | 保留扩展 |
-| `EMBODIED.md` | 继续作为 target profile | 保留扩展 |
-| `LESSONS.md` | 继续作为失败经验库 | 保留扩展 |
 
 ---
 

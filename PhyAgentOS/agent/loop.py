@@ -20,16 +20,13 @@ from PhyAgentOS.agent.subagent import SubagentManager
 from PhyAgentOS.agent.tools.cron import CronTool
 from PhyAgentOS.agent.tools.agent import AgentModeTool
 from PhyAgentOS.agent.tools.image import ImageTool
-from PhyAgentOS.agent.tools.embodied import EmbodiedActionTool
 from PhyAgentOS.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
 from PhyAgentOS.agent.tools.message import MessageTool
 from PhyAgentOS.agent.tools.registry import ToolRegistry
 from PhyAgentOS.agent.tools.scene_graph import SceneGraphQueryTool
 from PhyAgentOS.agent.tools.shell import ExecTool
-from PhyAgentOS.agent.tools.semantic_navigation import SemanticNavigationTool
 from PhyAgentOS.agent.tools.spawn import SpawnTool
 from PhyAgentOS.agent.tools.web import WebFetchTool, WebSearchTool
-from PhyAgentOS.agent.tools.target_navigation import TargetNavigationTool
 from PhyAgentOS.bus.events import InboundMessage, OutboundMessage
 from PhyAgentOS.bus.queue import MessageBus
 from PhyAgentOS.providers.base import LLMProvider
@@ -72,6 +69,8 @@ class AgentLoop:
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
         embodiment_registry: EmbodimentRegistry | None = None,
+        runtime_enabled: bool = True,
+        runtime_target_enabled: dict[str, bool] | None = None,
     ):
         from PhyAgentOS.config.schema import ExecToolConfig
         self.bus = bus
@@ -87,7 +86,11 @@ class AgentLoop:
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
 
-        self.context = ContextBuilder(workspace)
+        self.context = ContextBuilder(
+            workspace,
+            runtime_enabled=runtime_enabled,
+            runtime_target_enabled=runtime_target_enabled,
+        )
         self.sessions = session_manager or SessionManager(workspace)
         self.tools = ToolRegistry()
         self.embodiment_registry = embodiment_registry
@@ -148,24 +151,7 @@ class AgentLoop:
             self.tools.register(AgentModeTool(self.provider))
             self.tools.register(ImageTool(self.provider, send_callback=self.bus.publish_outbound))
 
-        action_tool = EmbodiedActionTool(
-            workspace=self.workspace,
-            provider=self.provider,
-            model=self.model,
-            registry=self.embodiment_registry,
-        )
-        self.tools.register(action_tool)
         self.tools.register(SceneGraphQueryTool(workspace=self.workspace))
-        self.tools.register(SemanticNavigationTool(
-            workspace=self.workspace,
-            action_tool=action_tool,
-            registry=self.embodiment_registry,
-        ))
-        self.tools.register(TargetNavigationTool(
-            workspace=self.workspace,
-            action_tool=action_tool,
-            registry=self.embodiment_registry,
-        ))
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""

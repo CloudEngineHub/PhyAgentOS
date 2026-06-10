@@ -192,7 +192,7 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 | **Adapter + Bridge** | `TargetAdapter` + `PolicyAdapter` + `ActionBridge` 三段解耦，自动编排 |
 | **双轨 Skill Runtime** | `PolicySkillRuntime` 维护策略闭环 + `BuiltinSkillRuntime` 管理 Agent 交互闭环 |
 | **Strict Preflight** | 10 项前置校验（target / sensor / perception / contract / tool），不合格直接拒绝 |
-| **文件协议矩阵** | `TARGETS.md` · `SKILLS.md` · `SESSIONS.md` · `ENVIRONMENT.md` · `LESSONS.md` |
+| **文件协议矩阵** | `TARGETS.md` · `SKILLRUNTIME.md` · `SESSIONS.md` · `ENVIRONMENT.md` · `LESSONS.md` |
 | **多层安全** | Critic 校验 → Preflight 契约检查 → Target 端 SafetyGuard → Operator Override |
 | **Fleet 模式** | 多机器人协同，shared + per-robot 工作区，优先级串行调度 |
 | **感知插件体系** | `SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` 可审计写回 |
@@ -231,7 +231,7 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 
 ### 当前架构（Session-Centered Runtime）
 
-当前 Track B 以 session 为中心：`WatchdogSupervisor` 监督 session 状态流，`SessionRunner` 负责 target lifecycle，`TargetSessionHandle` 是 policy/builtin skill 访问 target 的唯一执行面。Track A 与 Track B 通过 `TARGETS.md`、`SKILLS.md`、`SESSIONS.md`、`ENVIRONMENT.md` 等文件协议通信。
+当前 Track B 以 session 为中心：`WatchdogSupervisor` 监督 session 状态流，`SessionRunner` 负责 target lifecycle，`TargetSessionHandle` 是 policy/builtin skill 访问 target 的唯一执行面。Track A 与 Track B 通过 `TARGETS.md`、`SKILLRUNTIME.md`、`SESSIONS.md`、`ENVIRONMENT.md` 等文件协议通信。
 
 ### Legacy HAL 兼容
 
@@ -241,8 +241,8 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 |--------|--------|------|
 | `BaseDriver` | `RolloutTarget` + `SkillRuntime` + `TargetAdapter` | 拆分为三个一级对象 |
 | `hal_watchdog.py` | `WatchdogSupervisor` | 从动作轮询器升级为执行会话监督器 |
-| `ACTION.md` | `SESSIONS.md` | Session schema 替代 action schema |
-| `ROBOTS.md` | `TARGETS.md` | 扩展为 sim + real 统一索引 |
+| 单动作队列 | `SESSIONS.md` | Session schema 是当前执行队列 |
+| 机器人专用索引 | `TARGETS.md` | 统一 sim / game / real target registry |
 | 导航/ReKep 作为驱动内功能 | `SkillRuntime`（BuiltinAlgorithmSkillRuntime） | 提升为一级 skill runtime |
 | 仿真驱动 | `SimTarget` | 提升为一级 rollout target |
 
@@ -411,8 +411,8 @@ paos onboard
 paos agent
 ```
 
-`paos agent` / `paos gateway` 会自动创建 runtime workspace 并启动 session watchdog。
-Agent 根据 `TARGETS.md` 与 `SKILLS.md` 规划，并向 `SESSIONS.md` 追加待执行 session。
+当 config 启用 runtime 时，`paos agent` / `paos gateway` 会自动创建 runtime workspace 并启动 session watchdog。
+Agent 根据 agent context 与 runtime 协议文件规划；执行前读取 `TARGETS.md` 与 `SKILLRUNTIME.md`，并向 `SESSIONS.md` 追加待执行 session。
 
 **真实 LIBERO benchmark + pi0.5 policy**：
 ```bash
@@ -463,7 +463,7 @@ PhyAgentOS/
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
-│   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
+│   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
 │   │   ├── libero/            #   LIBERO target adapter
 │   │   └── openpi/            #   OpenPI policy adapters

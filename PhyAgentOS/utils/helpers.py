@@ -6,8 +6,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import tiktoken
 import yaml
+
+try:
+    import tiktoken
+except ModuleNotFoundError:  # pragma: no cover - depends on optional install extras
+    tiktoken = None
 
 _YAML_BLOCK_RE = re.compile(
     r"(?P<fence>`{3,}|~{3,})\s*(?P<lang>json|yaml|yml)\s*\n(?P<body>.*?)(?:\n(?P=fence)\s*)",
@@ -215,6 +219,11 @@ def sync_workspace_templates(
     if not tpl.is_dir():
         return []
 
+    runtime_protocol_files = {"TARGETS.md", "SKILLRUNTIME.md", "SESSIONS.md"}
+    effective_exclude = set(exclude or ())
+    if include is None:
+        effective_exclude.update(runtime_protocol_files)
+
     added: list[str] = []
 
     def _write(src, dest: Path):
@@ -229,7 +238,7 @@ def sync_workspace_templates(
             continue
         if include is not None and item.name not in include:
             continue
-        if exclude is not None and item.name in exclude:
+        if item.name in effective_exclude:
             continue
         _write(item, workspace / item.name)
     _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")

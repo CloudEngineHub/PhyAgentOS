@@ -46,7 +46,7 @@ class TargetSpec(BaseModel):
     embodiment: str | None = None
     enabled: bool = True
     workspace: str
-    supported_skills: list[str] = Field(default_factory=list)
+    supported_skillruntimes: list[str] = Field(default_factory=list)
     runtime: TargetRuntimeSpec
     observation: TargetObservationContract = Field(default_factory=TargetObservationContract)
     perception: TargetPerceptionRefs = Field(default_factory=TargetPerceptionRefs)

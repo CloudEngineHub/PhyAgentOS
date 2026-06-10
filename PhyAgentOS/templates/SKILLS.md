@@ -1,60 +1,37 @@
-# Runtime Skills
+# Agent Skills
+
+Skills are Markdown instructions that extend the agent's behavior.
+They are separate from runtime skill runtimes in `SKILLRUNTIME.md`.
+
+## Locations
+
+- Workspace skills: `skills/<skill-name>/SKILL.md`
+- Built-in skills: packaged under `PhyAgentOS/skills/<skill-name>/SKILL.md`
+- Workspace skills override built-in skills with the same name.
+
+## Frontmatter
+
+Each skill may start with YAML frontmatter:
 
 ```yaml
-version: runtime_skill_registry_v1
-skills:
-  - id: pi05_libero_remote
-    runtime: OpenPISkillRuntime
-    runtime_kind: policy
-    loop_mode: policy_closed_loop
-    agent_exposure: none
-    supported_target_kinds:
-      - simulation
-      - real_robot
-    policy:
-      policy_client: openpi
-      policy_adapter: policy_adapter://openpi_pi05_adapter
-      supports_chunk: true
-    observation_contract:
-      observation_type: multimodal
-      empty_observation_allowed: false
-    supports_chunk: true
-    default_replan_every: 5
-    requires:
-      sensors: []
-      environment_outputs: []
-      strict_environment_contract: true
-    input_contract:
-      images:
-        - observation/image
-        - observation/wrist_image
-      state: observation/state
-      prompt: prompt
-    output_contract:
-      action:
-        action_space_id: libero_pi05_delta_eef_gripper_v1
-        tensor_key: actions
-        shape:
-          - T
-          - 7
-        dtype: float32
-        normalized: false
-        representation: delta_eef_pose_gripper
-        frame: base
-        chunk:
-          variable_T: true
-          default_T: 50
-          policy_hz: 20
-    adapter_requirements:
-      allowed_bridges:
-        - bridge://safety_clamp
-      forbidden:
-        - implicit_shape_truncation
-        - implicit_representation_cast
-  - id: minecraft_navigate
-    category: builtin
-    runtime: MinecraftSkillRuntime
-    supported_targets: [minecraft_java_env]
-    requires:
-      environment_outputs: [player_position, nearby_blocks]
+---
+name: example-skill
+description: Short user-facing summary.
+metadata: {"PhyAgentOS":{"always":false,"available":true}}
+---
 ```
+
+The metadata key may be `PhyAgentOS` or `openclaw`; both are accepted.
+
+## Loading Rules
+
+- Skills with `always: true` are loaded directly into context when requirements are met.
+- Other available skills appear in the skills summary and can be read on demand.
+- Skills with unmet requirements are listed as unavailable.
+- Dependency requirements can declare CLI binaries or environment variables under `requires`.
+
+## Authoring Rules
+
+- Keep a skill focused on one capability or workflow.
+- Put reusable scripts and references inside the skill directory.
+- Do not duplicate runtime registry entries here; use `SKILLRUNTIME.md` for runtime execution contracts.

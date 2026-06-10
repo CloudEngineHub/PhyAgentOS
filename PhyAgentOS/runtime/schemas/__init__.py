@@ -28,12 +28,12 @@ from PhyAgentOS.runtime.schemas.session import (
     SessionSpec,
     SessionStatus,
 )
-from PhyAgentOS.runtime.schemas.skill import (
+from PhyAgentOS.runtime.schemas.skillruntime import (
     SkillObservationContract,
     SkillPolicySpec,
     SkillRequirements,
-    SkillSpec,
-    SkillsDocument,
+    SkillRuntimeSpec,
+    SkillRuntimeDocument,
     TargetToolPolicy,
 )
 from PhyAgentOS.runtime.schemas.target import (
@@ -69,8 +69,8 @@ __all__ = [
     "SessionSpec",
     "SessionStatus",
     "SkillRequirements",
-    "SkillSpec",
-    "SkillsDocument",
+    "SkillRuntimeSpec",
+    "SkillRuntimeDocument",
     "TargetActionContract",
     "TargetObservationContract",
     "TargetPerceptionRefs",

@@ -32,12 +32,13 @@
 ```
 Agent (paos agent)                        Watchdog
 ──────────────────                        ────────
-读 ENVIRONMENT.md                         轮询 ACTION.md
-  → 看到: pos=(-37,63,-94),                  → POST /action
+读 TARGETS.md / SKILLRUNTIME.md            claim SESSIONS.md
+读 ENVIRONMENT.md                           → preflight
+  → 看到: pos=(-37,63,-94),                  → 启动 Minecraft target runtime
     blocks=[oak_log at (10,64,5)],           → observe()
-    inventory=[]                             → 写 ENVIRONMENT.md
+    inventory=[]                             → 写 ENVIRONMENT.md / SESSIONS.md
   → 决策: collect oak_log 5                          ↓
-  → 写 ACTION.md                        Agent 读新 ENVIRONMENT.md
+  → 写 SESSIONS.md                      Agent 读新 ENVIRONMENT.md
   → 读 ENVIRONMENT.md                        → 验证结果
   → 决策: move target=player                  → 继续...
   → ...
@@ -48,11 +49,12 @@ Agent (paos agent)                        Watchdog
 | 组件 | 说明 |
 |------|------|
 | ENVIRONMENT.md | watchdog 写入——bot 位置/朝向/血量/附近方块/实体/背包/玩家/最近动作 |
-| ACTION.md | Agent 写入——待执行的动作队列 |
-| EMBODIED.md | Agent 读入——合法动作约束（Critic 校验） |
-| Watchdog | 轮询 ACTION.md → 执行 → 写 ENVIRONMENT.md |
-| Agent (planner) | 读 ENVIRONMENT.md → LLM 决策 → 写 ACTION.md |
-| Agent (critic) | 对照 EMBODIED.md 校验动作合法性 |
+| TARGETS.md | Runtime target registry，声明 Minecraft target 是否启用、endpoint 与 adapter |
+| SKILLRUNTIME.md | Runtime skill registry，声明 Minecraft builtin/policy runtime 能力 |
+| SESSIONS.md | Agent 写入 pending session；watchdog claim、执行并写回结果 |
+| EMBODIED.md | Agent 读入——target 能力的人类可读描述 |
+| Watchdog | claim SESSIONS.md → preflight → 执行 → 写 ENVIRONMENT.md / SESSIONS.md |
+| Agent (planner) | 读上下文与 runtime 状态 → LLM 决策 → 写 SESSIONS.md |
 
 ---
 
@@ -98,11 +100,12 @@ paos agent "绕过障碍物走到坐标 100 64 200"
 
 ## 四、实现方案
 
-**方案 A：恢复 watchdog 机制**（之前已实现过一版，后因过度复杂化删除了）
+**方案 A：使用 session-centered runtime**
 
-1. 恢复 `minecraft_action_runner.py`（精简版——仅轮询 ACTION.md + 执行 + 写 ENVIRONMENT.md，不加额外复杂度）
-2. Agent 通过 `execute_robot_action` 工具单步写入 ACTION.md
-3. watchdog 执行后写入 ENVIRONMENT.md，Agent 读回状态
+1. 在 `TARGETS.md` 中启用 Minecraft target
+2. 在 `SKILLRUNTIME.md` 中声明 Minecraft runtime
+3. Agent 向 `SESSIONS.md` 追加 pending session
+4. Watchdog 执行后写入 `ENVIRONMENT.md` 与 session result，Agent 读回状态
 
 **方案 B：直接在 Agent 循环内嵌 Target 调用**
 
@@ -110,7 +113,7 @@ paos agent "绕过障碍物走到坐标 100 64 200"
 2. 不需要中间文件协议
 3. 更简单但耦合度更高
 
-**推荐方案 A**——与 PhyAgentOS 文件协议一致，支持多 Target 扩展。
+**推荐方案 A**——与 PhyAgentOS runtime 文件协议一致，支持多 Target 扩展。
 
 ---
 

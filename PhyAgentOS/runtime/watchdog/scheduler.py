@@ -8,8 +8,8 @@ from PhyAgentOS.runtime.schemas import (
     SessionsDocument,
     SessionSpec,
     SessionStatus,
-    SkillSpec,
-    SkillsDocument,
+    SkillRuntimeSpec,
+    SkillRuntimeDocument,
     TargetSpec,
     TargetsDocument,
 )
@@ -21,9 +21,9 @@ from PhyAgentOS.runtime.watchdog.errors import SchemaValidationError
 class ScheduledSession:
     session: SessionSpec
     target_spec: TargetSpec
-    skill_spec: SkillSpec
+    skillruntime_spec: SkillRuntimeSpec
     target_id: str
-    skill_id: str
+    skillruntime_id: str
 
 
 class SessionScheduleError(SchemaValidationError):
@@ -43,7 +43,7 @@ class SessionScheduler:
         self,
         sessions_doc: SessionsDocument,
         targets_doc: TargetsDocument,
-        skills_doc: SkillsDocument,
+        skillruntimes_doc: SkillRuntimeDocument,
     ) -> ScheduledSession | None:
         pending = [
             (idx, session)
@@ -57,7 +57,7 @@ class SessionScheduler:
             key=lambda item: (self._PRIORITY_RANK.get(item[1].priority, 1), item[0]),
         )
         try:
-            return self.resolve_session(session, targets_doc, skills_doc)
+            return self.resolve_session(session, targets_doc, skillruntimes_doc)
         except SchemaValidationError as exc:
             raise SessionScheduleError(session.session_id, str(exc)) from exc
 
@@ -65,24 +65,24 @@ class SessionScheduler:
         self,
         session: SessionSpec,
         targets_doc: TargetsDocument,
-        skills_doc: SkillsDocument,
+        skillruntimes_doc: SkillRuntimeDocument,
     ) -> ScheduledSession:
         target_id = strip_ref(session.target_ref, "target://")
-        skill_id = strip_ref(session.skill_ref, "skill://")
+        skillruntime_id = strip_ref(session.skillruntime_ref, "skillruntime://")
         target_spec = self._find_target(targets_doc, target_id)
-        skill_spec = self._find_skill(skills_doc, skill_id)
-        if skill_id not in target_spec.supported_skills:
-            raise SchemaValidationError(f"target {target_id} does not support skill {skill_id}")
-        if target_spec.target_kind not in skill_spec.supported_target_kinds:
+        skillruntime_spec = self._find_skillruntime(skillruntimes_doc, skillruntime_id)
+        if skillruntime_id not in target_spec.supported_skillruntimes:
+            raise SchemaValidationError(f"target {target_id} does not support skillruntime {skillruntime_id}")
+        if target_spec.target_kind not in skillruntime_spec.supported_target_kinds:
             raise SchemaValidationError(
-                f"skill {skill_id} does not support target kind {target_spec.target_kind}"
+                f"skillruntime {skillruntime_id} does not support target kind {target_spec.target_kind}"
             )
         return ScheduledSession(
             session=session,
             target_spec=target_spec,
-            skill_spec=skill_spec,
+            skillruntime_spec=skillruntime_spec,
             target_id=target_id,
-            skill_id=skill_id,
+            skillruntime_id=skillruntime_id,
         )
 
     def _find_target(self, document: TargetsDocument, target_id: str) -> TargetSpec:
@@ -91,8 +91,8 @@ class SessionScheduler:
                 return target
         raise SchemaValidationError(f"target not found: {target_id}")
 
-    def _find_skill(self, document: SkillsDocument, skill_id: str) -> SkillSpec:
-        for skill in document.skills:
-            if skill.id == skill_id:
-                return skill
-        raise SchemaValidationError(f"skill not found: {skill_id}")
+    def _find_skillruntime(self, document: SkillRuntimeDocument, skillruntime_id: str) -> SkillRuntimeSpec:
+        for skillruntime in document.skillruntimes:
+            if skillruntime.id == skillruntime_id:
+                return skillruntime
+        raise SchemaValidationError(f"skillruntime not found: {skillruntime_id}")
