@@ -32,7 +32,7 @@
 README_zh.md
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
-| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | 基于 ![v0.2.2](https://img.shields.io/badge/v0.2.2-47A882) 清理了协议文件以及文档 |
+| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | 基于 ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) 清理了协议文件以及文档 |
 | ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | 基于 ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) 的MineCraft通路优化，可以在终端和游戏内下达指令并执行 |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | 基于 ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) 的MineCraft 就绪，以云端agent接入用户的本地服务器 |
 | ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |

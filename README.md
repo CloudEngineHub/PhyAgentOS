@@ -32,7 +32,7 @@
 
 | Version | Date | Update |
 |:------|:-----|:-------|
-| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | Based on ![v0.2.2](https://img.shields.io/badge/v0.2.2-47A882) — Clean Protocol Files and Docs |
+| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | Based on ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) — Clean Protocol Files and Docs |
 | ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | Based on ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) — Minecraft pipeline optimization: issue and execute commands from terminal and in-game chat |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | Based on ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) — Minecraft ready: cloud agent connects to user's local server |
 | ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
