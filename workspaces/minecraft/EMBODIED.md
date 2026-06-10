@@ -27,6 +27,22 @@
 | `equip` | `type, dest` | Equip an item |
 | `craft` | `item, count` | Craft items |
 
+## Critic Guidance
+
+- This is a Minecraft game bot, not a physical robot. No physical safety constraints apply.
+- The bot operates in a virtual 3D block world via mineflayer API.
+- `move` action accepts absolute coordinates (dx, dy, dz, absolute=true) or relative moves (forward=N). Also supports target=entity for tracking. Mineflayer pathfinder handles obstacle avoidance automatically.
+- `look` action accepts yaw/pitch in degrees. 0=south, 90=west, 180=north, -90=east. Verify angles are within valid ranges.
+- `dig` action requires absolute coordinates (x, y, z). Reject dig if coordinates are unknown. Prefer collect over dig for gathering blocks.
+- `collect` action requires block_type and count. The mineflayer-collectblock plugin handles pathfinding automatically.
+- `place` action requires x, y, z and face (0=down, 1=up, 2=north, 3=south, 4=west, 5=east).
+- `craft` action requires recipe_id and count. Standard Minecraft recipes only.
+- `select_slot` action requires slot 0-8. Reject if slot is out of range.
+- `chat` action: any non-empty message is valid.
+- Block reach is approximately 4.5 blocks. Reject dig/place actions targeting blocks beyond this range if the bot's current position is known from ENVIRONMENT.md.
+- Empty parameters or unknown keys are NOT automatically invalid — some actions work with no params (use {}) or accept optional params that the mineflayer bridge may handle gracefully.
+- 不需要 scene_asset_path, objects, robot_start, arm_mass_scale 等物理机器人参数。如果参数中出现这些字段应忽略，不应因此拒绝动作。
+
 ## Physical Constraints
 
 - **Pathfinder**: mineflayer `pathfinder` for `move` actions; can fail on complex terrain or unreachable coordinates.

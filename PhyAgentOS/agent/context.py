@@ -24,7 +24,7 @@ class ContextBuilder:
     EMBODIED_FILES = [
         "EMBODIED.md", "ENVIRONMENT.md", "LESSONS.md", "ROBOTS.md",
         "TASK.md", "ORCHESTRATOR.md",
-        "RUNTIME.md",
+        "RUNTIME.md", "TARGETS.md", "SKILLS.md",
         "MEMORY_SPATIAL.md", "TIMELINE.md",
     ]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
@@ -103,9 +103,7 @@ Your workspace is at: {workspace_path}
 - After writing or editing a file, re-read it if accuracy matters.
 - If a tool call fails, analyze the error before retrying with a different approach.
 - Ask for clarification when the request is ambiguous.
-- If `EMBODIED.md` in the workspace documents embodied actions (e.g. manipulation sim: `enter_simulation`, `navigate_to_named`) and the user asks to start simulation, go to the desk/table, or pick objects, prefer **`execute_robot_action`** (and remind them the HAL watchdog must be running) instead of treating the request as a generic clarification question.
-- For `execute_robot_action` with `action_type` `enter_simulation` or `start`, you **must** pass `parameters: {{}}` when the user did not supply scene overrides; do **not** claim that empty parameters are insufficient—call the tool and let HAL report errors if the watchdog is misconfigured.
-
+- If `TARGETS.md` and `SKILLS.md` are present in the workspace, they define available runtime targets and skills. Read them to understand what execution targets are available before responding to embodied action requests.
 Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
 
     @staticmethod

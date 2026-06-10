@@ -1,0 +1,38 @@
+{
+  "benchmark": null,
+  "error_code": null,
+  "error_message": null,
+  "metadata": {
+    "artifacts": {},
+    "final_status": {
+      "executed_steps": 1,
+      "num_steps": 1,
+      "reward": 0.0
+    },
+    "step_results": [
+      {
+        "ok": true,
+        "params": {
+          "absolute": true,
+          "dx": 20.5,
+          "dy": 64,
+          "dz": -227.5
+        },
+        "result": "moving to (20.5, 64.0, -227.5)",
+        "step": 0,
+        "type": "move"
+      }
+    ],
+    "task": "\u5bfc\u822a\u5230\u73a9\u5bb6 wissingcc \u8eab\u8fb9 (20.5, 64, -227.5)"
+  },
+  "num_steps": 1,
+  "policy_latency_ms": {
+    "mean": null
+  },
+  "return_value": 0.0,
+  "session_id": "nav_to_wissingcc_v2",
+  "skill_id": "minecraft_navigate",
+  "status": "succeeded",
+  "success": true,
+  "target_id": "minecraft_java_env"
+}

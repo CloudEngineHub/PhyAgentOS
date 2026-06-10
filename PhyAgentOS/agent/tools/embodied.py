@@ -31,6 +31,17 @@ if TYPE_CHECKING:
 # LLMs often put HAL fields next to action_type instead of inside `parameters`.
 _TOOL_RESERVED_KEYS = frozenset({"action_type", "parameters", "reasoning"})
 _ENV_JSON_BLOCK_RE = re.compile(r"```json\s*\n(.*?)\n```", re.DOTALL)
+_CRITIC_GUIDANCE_SECTION_RE = re.compile(
+    r"##\s+Critic\s+Guidance\s*\n(.*?)(?=\n##\s|\Z)", re.DOTALL | re.IGNORECASE
+)
+
+
+def _extract_critic_guidance_section(content: str) -> str | None:
+    """Extract the body of ``## Critic Guidance`` from EMBODIED.md content."""
+    m = _CRITIC_GUIDANCE_SECTION_RE.search(content)
+    if m:
+        return m.group(1).strip()
+    return None
 
 
 class EmbodiedActionTool(Tool):
@@ -49,13 +60,14 @@ class EmbodiedActionTool(Tool):
             "the HAL driver that was started with `--driver-config`. "
             "Requires a running HAL watchdog for the target driver; the watchdog copies "
             "EMBODIED.md from the driver profile into the workspace. "
-            "For PiperGo2 manipulation sim, typical action_type values include: "
-            "`enter_simulation` or `start` (same meaning; parameters may be `{}` when the "
-            "watchdog was started with `--driver-config` — scene path/objects are already loaded). "
-            "`navigate_to_named` (parameters: waypoint_key or target, e.g. desk, staging_table). "
-            "`describe_visible_scene`, `run_pick_place`, `close`. "
-            "Reference JSON for humans: workspace file `configs/pipergo2_manipulation_driver.json` "
-            "(not the repo-relative `examples/` path)."
+            "For **Minecraft**, this writes actions to ACTION.md — the session watchdog "
+            "(WatchdogSupervisor, started automatically by `paos agent`) polls SESSIONS.md "
+            "instead; prefer `write_file` to append to SESSIONS.md for Minecraft tasks. "
+            "For **PiperGo2 manipulation sim**, typical action_type values include: "
+            "`enter_simulation` or `start` (parameters may be `{}` when the "
+            "watchdog was started with `--driver-config`), "
+            "`navigate_to_named` (parameters: waypoint_key or target), "
+            "`describe_visible_scene`, `run_pick_place`, `close`."
         )
 
     @property
@@ -68,8 +80,7 @@ class EmbodiedActionTool(Tool):
                     "description": (
                         "The type of action to execute. Generic HAL examples: "
                         "'move_to', 'pick_up', 'put_down', 'semantic_navigate', 'connect_robot'. "
-                        "PiperGo2 manipulation sim: 'enter_simulation'|'start', 'navigate_to_named', "
-                        "'navigate_to_waypoint', 'describe_visible_scene', 'run_pick_place', 'close', 'api_call'."
+                        "Read EMBODIED.md for the full list of supported actions for the current target."
                     ),
                 },
                 "parameters": {
@@ -199,7 +210,7 @@ class EmbodiedActionTool(Tool):
             "If ENVIRONMENT contains scene session metadata (for example `scene_sessions` "
             "or per-robot `scene_id`), scope your judgement to the requested `robot_id` "
             "and its scene context instead of treating unrelated robot runtime as conflicts.\n"
-            f"{self._critic_guidance(action_type)}\n"
+            f"{self._critic_guidance(embodied_content)}\n"
             "If it is safe and valid, respond with exactly 'VALID'.\n"
             "If it is unsafe, out of bounds, or invalid, respond with 'INVALID: <reason>'.\n"
         )
@@ -469,21 +480,10 @@ class EmbodiedActionTool(Tool):
         return True
 
     @staticmethod
-    def _critic_guidance(action_type: str) -> str:
-        if action_type in ("start", "enter_simulation"):
-            return (
-                "For start/enter_simulation on the PiperGo2 manipulation driver: empty parameters {} "
-                "are VALID when the robot profile states that the HAL watchdog loads the full "
-                "driver JSON via --driver-config (scene path, objects, waypoints already injected). "
-                "Do not require scene_asset_path in the action if that contract is documented in EMBODIED.md."
-            )
-        if action_type == "target_navigation":
-            return (
-                "When evaluating target navigation, do not require the target to already exist in the scene graph. "
-                "Instead verify that lower-level target navigation is supported, the requested visual target or "
-                "detection hint is specific enough to pursue safely, connection state allows navigation, and the "
-                "current nav state suggests the robot can accept the task."
-            )
+    def _critic_guidance(embodied_content: str) -> str:
+        guidance = _extract_critic_guidance_section(embodied_content)
+        if guidance:
+            return guidance
         return (
             "When evaluating semantic navigation and localization actions, verify target existence, navigation "
             "support, safe approach distance, connection availability, and whether current nav state suggests the "

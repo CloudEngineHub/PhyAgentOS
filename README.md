@@ -32,9 +32,10 @@
 
 | Version | Date | Update |
 |:------|:-----|:-------|
-| ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | Based on ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) — Minecraft pipeline optimization: issue and execute commands from terminal and in-game chat |
+| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-06-09 | Based on ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) — Minecraft pipeline optimization: Agent Loop now handles complex tasks with multi-turn observation–reasoning–action cycles |
+| ![v0.2.2](https://img.shields.io/badge/v0.2.2-11648A) | 2026-06-09 | Based on ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) — Minecraft pipeline optimization: issue and execute commands from terminal and in-game chat |
+| ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-05 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | Based on ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) — Minecraft ready: cloud agent connects to user's local server |
-| ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
 | ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) | 2026-05-25 | Strict separation of `PolicySkillRuntime` / `BuiltinSkillRuntime`; Game Agent & Benchmarking ready |
 | ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | Perception plugin system: `SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` auditable writeback |
 | ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP: `DummySimTarget` + `DummyAdapter` + `DummyClient` serial pipeline |
@@ -188,10 +189,13 @@ PhyAgentOS/
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
 │   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   │   ├── game/               #   Game targets (Minecraft etc.)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
+│   │   └── game/              #   Game skill runtimes (Minecraft etc.)
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
 │   │   ├── libero/            #   LIBERO target adapter
+│   │   ├── minecraft/         #   Minecraft target adapter
 │   │   └── openpi/            #   OpenPI policy adapters
 │   ├── policy/openpi/         #   OpenPI client + LeRobot pi0-family server
 │   ├── perception/            #   Perception Runtime / EnvironmentWriter

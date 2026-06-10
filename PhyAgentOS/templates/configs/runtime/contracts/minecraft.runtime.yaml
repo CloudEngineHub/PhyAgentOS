@@ -1,0 +1,34 @@
+version: runtime_target_contract_v1
+target_id: minecraft_java_env
+target_adapter: target_adapter://minecraft_adapter
+observation:
+  schema_source: sensor_config_ref
+  require_describe_observation_schema: false
+  allow_extra_channels: true
+  timestamp_required: false
+action_contract:
+  id: minecraft_java_env_action_v1
+  accepted_representations:
+    - minecraft_java_action
+  shape:
+    - T
+    - 1
+  dtype: object
+  normalized: false
+  frame: base
+  control_mode: discrete_action
+  control_hz: 20
+  components:
+    - {name: action, unit: discrete}
+  chunk:
+    max_chunk_size: 1
+    preferred_chunk_size: 1
+    preferred_replan_after_steps: 1
+    switch_policy: hard_switch
+safety:
+  require_target_side_validation: true
+  stop_on_nan: true
+  stop_on_timeout: true
+capabilities:
+  available_bridges: []
+  tf_frames: []
