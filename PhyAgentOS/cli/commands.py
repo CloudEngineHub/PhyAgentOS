@@ -41,7 +41,7 @@ app = typer.Typer(
 
 console = Console()
 EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit", ":q"}
-RUNTIME_PROTOCOL_TEMPLATE_FILES = {"TARGETS.md", "SKILLS.md", "SESSIONS.md"}
+RUNTIME_PROTOCOL_TEMPLATE_FILES = {"TARGETS.md", "SKILLRUNTIME.md", "SESSIONS.md"}
 
 # ---------------------------------------------------------------------------
 # CLI input: prompt_toolkit for editing, paste, history, and display
@@ -399,6 +399,8 @@ def gateway(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         embodiment_registry=registry,
+        runtime_enabled=config.runtime.enabled,
+        runtime_target_enabled=config.runtime.target_enabled,
     )
 
     # Set cron callback (needs agent)
@@ -590,6 +592,8 @@ def agent(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         embodiment_registry=registry,
+        runtime_enabled=config.runtime.enabled,
+        runtime_target_enabled=config.runtime.target_enabled,
     )
 
     # Show spinner when logs are off (no output to miss); skip when logs are on

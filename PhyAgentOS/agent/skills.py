@@ -142,6 +142,8 @@ class SkillsLoader:
     def _get_missing_requirements(self, skill_meta: dict) -> str:
         """Get a description of missing requirements."""
         missing = []
+        if not self._metadata_available(skill_meta):
+            missing.append("available: false")
         requires = skill_meta.get("requires", {})
         for b in requires.get("bins", []):
             if not shutil.which(b):
@@ -176,6 +178,8 @@ class SkillsLoader:
 
     def _check_requirements(self, skill_meta: dict) -> bool:
         """Check if skill requirements are met (bins, env vars)."""
+        if not self._metadata_available(skill_meta):
+            return False
         requires = skill_meta.get("requires", {})
         for b in requires.get("bins", []):
             if not shutil.which(b):
@@ -184,6 +188,14 @@ class SkillsLoader:
             if not os.environ.get(env):
                 return False
         return True
+
+    @staticmethod
+    def _metadata_available(skill_meta: dict) -> bool:
+        """Return false only for an explicit available=false metadata marker."""
+        available = skill_meta.get("available")
+        if isinstance(available, str):
+            return available.strip().lower() not in {"false", "0", "no", "off"}
+        return available is not False
 
     def _get_skill_meta(self, name: str) -> dict:
         """Get PhyAgentOS metadata for a skill (cached in frontmatter)."""

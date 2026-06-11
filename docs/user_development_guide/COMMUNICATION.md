@@ -53,12 +53,9 @@ Fleet 模式：
 - `ENVIRONMENT.md`
   - Global environment truth source
   - Scene graph, map, TF, and per-robot runtime state
-- `ROBOTS.md`
-  - Auto-generated fleet directory
-  - Summarizes robot id, driver, type, concise capability summary, workspace, enablement, connection state, and nav state
 - `LESSONS.md`
   - Shared failure memory and action rejection notes
-- `TARGETS.md`, `SKILLS.md`, `SESSIONS.md`
+- `TARGETS.md`, `SKILLRUNTIME.md`, `SESSIONS.md`
   - Runtime target registry, skill registry, and session queue
   - Used by the session-centered runtime instead of direct Agent-to-target calls
 - `TASK.md`
@@ -71,12 +68,9 @@ Shared workspace 文件：
 - `ENVIRONMENT.md`
   - 全局环境真相源
   - 保存 scene graph、map、TF 和各机器人的运行态
-- `ROBOTS.md`
-  - 自动生成的机器人目录
-  - 摘要记录 robot id、driver、类型、简要能力、workspace、启用状态、连接状态、导航状态
 - `LESSONS.md`
   - 共享失败经验和动作拒绝记录
-- `TARGETS.md`、`SKILLS.md`、`SESSIONS.md`
+- `TARGETS.md`、`SKILLRUNTIME.md`、`SESSIONS.md`
   - Runtime target registry、skill registry 与 session 队列
   - 被 session-centered runtime 使用，避免 Agent 直接调用 target
 - `TASK.md`
@@ -84,21 +78,19 @@ Shared workspace 文件：
 - `ORCHESTRATOR.md`
   - 全局监督与协调状态
 
-### Robot workspace files
+### Agent-facing workspace files
 
-- `ACTION.md`
-  - Action queue for one robot instance only
+- `SKILLS.md`
+  - Describes how agent skills are discovered and loaded.
 - `EMBODIED.md`
-  - Runtime robot profile copied from `hal/profiles/*.md`
-  - Used by Critic validation for that specific robot
+  - Human-readable target capability descriptions; target sections can be filtered by enabled runtime targets.
 
-Robot workspace 文件：
+Agent-facing workspace 文件：
 
-- `ACTION.md`
-  - 单个机器人实例自己的动作队列
+- `SKILLS.md`
+  - 描述 Agent skills 的发现与加载规则。
 - `EMBODIED.md`
-  - 从 `hal/profiles/*.md` 复制来的运行时机器人 profile
-  - 被 Critic 用来校验这台机器人的具体动作
+  - 面向 Agent 的 target 能力描述；可按启用的 runtime target 过滤 target section。
 
 ## 4. Template vs Profile / 模板与 Profile 的区别
 
@@ -129,29 +121,27 @@ Concrete robot values must live in `hal/profiles/*.md`.
 Usually reads the shared workspace:
 
 - `ENVIRONMENT.md`
-- `ROBOTS.md`
 - `LESSONS.md`
 - `TASK.md`
 - `ORCHESTRATOR.md`
 
 The main Agent does not automatically ingest every robot profile in fleet mode.
 
-### Critic via `EmbodiedActionTool`
+When scheduling runtime execution, it reads:
 
-When validating one action for one robot, it reads:
+- `TARGETS.md`
+- `SKILLRUNTIME.md`
+- `ENVIRONMENT.md`
+- `RUNTIME.md`
 
-- shared `ENVIRONMENT.md`
-- target robot's runtime `EMBODIED.md`
-- action draft and reasoning
-
-This means capability-specific validation happens at dispatch time.
+It writes pending work to `SESSIONS.md`.
 
 ### Watchdog
 
 The session-centered `WatchdogSupervisor` reads:
 
 - `TARGETS.md`
-- `SKILLS.md`
+- `SKILLRUNTIME.md`
 - `SESSIONS.md`
 - external runtime YAML under `configs/runtime/`
 
@@ -167,27 +157,23 @@ During execution, the watchdog schedules sessions serially and supervises each r
 
 Planner / 主 Agent：
 
-- 默认主要读取 shared workspace：
+  - 默认主要读取 shared workspace：
   - `ENVIRONMENT.md`
-  - `ROBOTS.md`
   - `LESSONS.md`
   - `TASK.md`
   - `ORCHESTRATOR.md`
-- 在 fleet 模式下，不会默认把每台机器人的完整 profile 全量注入上下文
-
-Critic（通过 `EmbodiedActionTool`）：
-
-- 对某个机器人做动作校验时，会读取：
-  - shared `ENVIRONMENT.md`
-  - 目标机器人的 runtime `EMBODIED.md`
-  - 当前动作草案与 reasoning
-- 也就是说，针对具体机器人能力的精确判断发生在动作派发阶段
+- 创建 runtime session 前会读取：
+  - `TARGETS.md`
+  - `SKILLRUNTIME.md`
+  - `ENVIRONMENT.md`
+  - `RUNTIME.md`
+- 然后向 `SESSIONS.md` 写入 pending work
 
 Watchdog：
 
 - session-centered `WatchdogSupervisor` 读取：
   - `TARGETS.md`
-  - `SKILLS.md`
+  - `SKILLRUNTIME.md`
   - `SESSIONS.md`
   - `configs/runtime/` 下的外部 runtime YAML
 - 它写入：
@@ -203,9 +189,9 @@ Watchdog：
 
 The runtime protocol keeps the upper/lower boundary file-based while moving execution to sessions:
 
-- `TARGETS.md` answers which targets exist, whether they are enabled, which skills they support, and which target class/kind, runtime endpoint, target adapter, sensor config, perception config, and runtime contract they use.
-- `SKILLS.md` declares `runtime_kind`, loop mode, agent exposure, supported target kinds, policy requirements, observation contract, required sensors/environment outputs, output action contract, target-tool policy, and allowed deterministic bridges.
-- `SESSIONS.md` declares a task, target, skill, timeout, priority, and routing hints. It does not bind pair adapters.
+- `TARGETS.md` answers which targets exist, whether they are enabled, which skill runtimes they support, and which target class/kind, runtime endpoint, target adapter, sensor config, perception config, and runtime contract they use.
+- `SKILLRUNTIME.md` declares `runtime_kind`, loop mode, agent exposure, supported target kinds, policy requirements, observation contract, required sensors/environment outputs, output action contract, target-tool policy, and allowed deterministic bridges.
+- `SESSIONS.md` declares a task, target, skill runtime, timeout, priority, and routing hints. It does not bind pair adapters.
 - `configs/runtime/contracts/<target_id>.runtime.yaml` declares target action contract and safety limits.
 - Adapter and bridge references use explicit URI namespaces such as `target_adapter://`, `policy_adapter://`, and `bridge://`.
 
@@ -218,13 +204,13 @@ preflight_checking -> rejected
 
 `RuntimeCompatibilityPreflight` resolves an `AdapterPlan` before execution. It validates protocol files, target/skill compatibility, adapter/bridge availability, sensor config declarations, perception config declarations, and runtime contracts. Actual target observation channels are checked when runtime reads an observation for environment refresh or skill execution. After preflight, `WatchdogSupervisor` creates a `SessionRunner`; the runner owns target lifecycle and exposes the target to policy or builtin skills only through `TargetSessionHandle`. Target runtimes and policy servers do not call each other directly.
 
-For remote targets, `targetws://` messages use the runtime envelope and msgpack serialization. RPC responses are correlated with the request by message type, sequence number, session id, target id, and skill id; mismatched responses are treated as target protocol errors.
+For remote targets, `targetws://` messages use the runtime envelope and msgpack serialization. RPC responses are correlated with the request by message type, sequence number, session id, target id, and skill runtime id; mismatched responses are treated as target protocol errors.
 
 Runtime 协议继续保持文件边界，但执行单位变成 session：
 
-- `TARGETS.md` 描述有哪些 target、是否启用、支持哪些 skill，以及 target class/kind、runtime endpoint、target adapter、sensor config、perception config、runtime contract。
-- `SKILLS.md` 声明 `runtime_kind`、loop mode、agent exposure、支持的 target kinds、policy 需求、observation contract、所需 sensors/environment outputs、输出动作契约、target-tool policy 和允许的确定性 bridge。
-- `SESSIONS.md` 声明任务、target、skill、timeout、priority 和 routing hints，不绑定 pair adapter。
+- `TARGETS.md` 描述有哪些 target、是否启用、支持哪些 skill runtime，以及 target class/kind、runtime endpoint、target adapter、sensor config、perception config、runtime contract。
+- `SKILLRUNTIME.md` 声明 `runtime_kind`、loop mode、agent exposure、支持的 target kinds、policy 需求、observation contract、所需 sensors/environment outputs、输出动作契约、target-tool policy 和允许的确定性 bridge。
+- `SESSIONS.md` 声明任务、target、skill runtime、timeout、priority 和 routing hints，不绑定 pair adapter。
 - `configs/runtime/contracts/<target_id>.runtime.yaml` 声明 target action contract 与安全限制。
 - Adapter 与 bridge 引用使用 `target_adapter://`、`policy_adapter://`、`bridge://` 等显式 URI 命名空间。
 
@@ -237,21 +223,21 @@ preflight_checking -> rejected
 
 `RuntimeCompatibilityPreflight` 会在执行前解析 `AdapterPlan`，并校验协议文件、target/skill 兼容性、adapter/bridge 可用性、sensor config 声明、perception config 声明和 runtime contract。真实 target observation 的 channel 会在 runtime 为环境刷新或技能执行读取 observation 时校验。Preflight 通过后，`WatchdogSupervisor` 创建 `SessionRunner`；runner 负责 target lifecycle，并且只通过 `TargetSessionHandle` 把 target 暴露给 policy 或 builtin skill。Target runtime 与 policy server 不直接互相调用。
 
-对于 remote target，`targetws://` 消息使用 runtime envelope 与 msgpack 序列化。RPC response 会通过 message type、sequence number、session id、target id 和 skill id 与 request 严格关联；关联不匹配会被视为 target protocol error。
+对于 remote target，`targetws://` 消息使用 runtime envelope 与 msgpack 序列化。RPC response 会通过 message type、sequence number、session id、target id 和 skill runtime id 与 request 严格关联；关联不匹配会被视为 target protocol error。
 
 ## 7. Typical Runtime Pipeline / 典型运行流程
 
 1. `paos onboard` prepares workspaces.
-2. Runtime protocol files define targets, skills, sessions, and external configs.
-3. User starts `paos agent` or `paos gateway`; the runtime workspace is provisioned and the session watchdog starts automatically.
+2. Runtime protocol files define targets, skill runtimes, sessions, and external configs.
+3. User starts `paos agent` or `paos gateway`; when runtime is enabled in config, the runtime workspace is provisioned and the session watchdog starts automatically.
 4. Agent plans from shared state and writes or updates a session.
 5. Watchdog claims a pending session and runs compatibility preflight.
 7. If accepted, watchdog creates a `SessionRunner`; the runner enters `running`, configures and starts the target session, then runs the selected skill runtime through `TargetSessionHandle` under heartbeat and execution-timeout supervision.
 8. Runtime writes session results, environment deltas, lessons, and artifacts.
 
 1. `paos onboard` 准备工作区。
-2. Runtime 协议文件定义 targets、skills、sessions 与外部配置。
-3. 用户启动 `paos agent` 或 `paos gateway`；系统自动创建 runtime workspace 并启动 session watchdog。
+2. Runtime 协议文件定义 targets、skill runtimes、sessions 与外部配置。
+3. 用户启动 `paos agent` 或 `paos gateway`；当 config 启用 runtime 时，系统自动创建 runtime workspace 并启动 session watchdog。
 4. Agent 基于 shared state 规划并写入或更新 session。
 5. Watchdog claim pending session 并执行 compatibility preflight。
 7. 如通过，watchdog 创建 `SessionRunner`；runner 进入 `running`，配置并启动 target session，然后在 heartbeat 与执行超时监督下通过 `TargetSessionHandle` 运行选定的 skill runtime。

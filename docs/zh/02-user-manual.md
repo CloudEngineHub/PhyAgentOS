@@ -62,9 +62,9 @@ PhyAgentOS 是一个显式解耦的双轨运行架构：
 
 1. 运行 `paos onboard` 初始化配置与工作区
 2. 启动 `paos agent` 或 `paos gateway`
-3. Agent 自动创建/刷新 runtime workspace，并启动 session watchdog
+3. 当 config 启用 runtime 时，Agent 自动创建/刷新 runtime workspace，并启动 session watchdog
 4. 用户输入自然语言任务
-5. Agent 读取 `TARGETS.md`、`SKILLS.md`、`ENVIRONMENT.md` 等工作区文件进行规划
+5. Agent 读取 `TARGETS.md`、`SKILLRUNTIME.md`、`ENVIRONMENT.md` 等工作区文件进行规划
 6. Agent 将可执行任务追加到 `SESSIONS.md`
 7. Watchdog claim pending session，执行 preflight、运行 target/skill，并写回 result、artifact 与环境状态
 
@@ -353,28 +353,17 @@ python hal/hal_watchdog.py --driver rekep_real
 #### 何时使用
 
 - 让一个 Agent 面向多个机器人实例协同规划
-- 将共享环境与机器人私有动作队列分开维护
-- 明确每台机器人的独立 `EMBODIED.md` 与 `ACTION.md`
+- 将共享环境、target registry 与 session 队列分开维护
+- 通过 `TARGETS.md`、`SKILLRUNTIME.md` 与 `SESSIONS.md` 管理多个 target 的执行入口
 
 #### 启动顺序
 
 1. 配置 `embodiments.mode = "fleet"`
 2. 运行 `paos onboard`
-3. 为每个机器人实例启动一个 Watchdog
-4. 启动一个 `paos agent`
+3. 启动 `paos agent` 或 `paos gateway`
+4. 当 runtime 启用时，runtime workspace 与 session watchdog 会自动启动
 
 ```bash
-# 机器人 1
-python hal/hal_watchdog.py \
-  --robot-id go2_edu_001 \
-  --driver-config examples/go2_driver_config.json
-
-# 机器人 2
-python hal/hal_watchdog.py \
-  --robot-id xlerobot_lab_001 \
-  --driver-config examples/xlerobot_2wheels_remote.driver.json
-
-# 统一 Agent
 paos agent
 ```
 
@@ -383,11 +372,11 @@ paos agent
 | 文件 | 位置 | 用途 |
 |------|------|------|
 | `ENVIRONMENT.md` | shared/ | 全局环境状态 |
-| `ROBOTS.md` | shared/ | 机器人目录摘要 |
+| `TARGETS.md` | runtime/shared | Target registry |
+| `SKILLRUNTIME.md` | runtime/shared | Skill runtime registry |
+| `SESSIONS.md` | runtime/shared | Session 队列与结果 |
 | `TASK.md` | shared/ | 多步任务状态 |
 | `ORCHESTRATOR.md` | shared/ | 全局编排状态 |
-| `EMBODIED.md` | per-robot/ | 单机器人运行时能力声明 |
-| `ACTION.md` | per-robot/ | 单机器人动作队列 |
 
 ---
 
@@ -435,7 +424,7 @@ paos minecraft say "挖5个橡木然后过来"
 | Windows 9 步部署流程 | [deployment.md](../../scenarios/game/minecraft/zh/deployment.md) |
 | 观察空间 schema | [deployment.md §3.3](../../scenarios/game/minecraft/zh/deployment.md#33-观察空间) |
 | 16 种动作空间 | [deployment.md §4](../../scenarios/game/minecraft/zh/deployment.md#四动作空间16-种) |
-| TARGETS.md / SKILLS.md 配置 | [deployment.md §5-6](../../scenarios/game/minecraft/zh/deployment.md#五配置-targetsmd) |
+| TARGETS.md / SKILLRUNTIME.md 配置 | [deployment.md §5-6](../../scenarios/game/minecraft/zh/deployment.md#五配置-targetsmd) |
 | Agent → SESSIONS.md 全链路 | [deployment.md §7](../../scenarios/game/minecraft/zh/deployment.md#七完整-pipelineagent-下发任务) |
 | CLI 与对话控制 | [usage.md](../../scenarios/game/minecraft/zh/usage.md) |
 | bot 传送 | [usage.md §3](../../scenarios/game/minecraft/zh/usage.md#三bot-传送) |
@@ -446,17 +435,21 @@ paos minecraft say "挖5个橡木然后过来"
 
 ## 2.7 运行时文件说明
 
-| 文件 | 位置 | 作用 |
-|------|------|------|
-| `ACTION.md` | 单机或 per-robot 工作区 | 待执行动作队列（JSON 格式） |
-| `EMBODIED.md` | 单机或 per-robot 工作区 | 当前机器人能力、约束与连接声明 |
-| `ENVIRONMENT.md` | 单机或 shared 工作区 | 当前环境、对象、地图、机器人状态 |
-| `LESSONS.md` | 单机或 shared 工作区 | Critic 拒绝动作后的失败经验记录 |
-| `TASK.md` | 单机或 shared 工作区 | 多步任务拆解状态 |
-| `SESSIONS.md` | 单机或 shared 工作区 | 执行会话队列（新版协议） |
-| `TARGETS.md` | shared 工作区 | 目标（机器人/仿真）注册索引 |
-| `ORCHESTRATOR.md` | shared 工作区 | 编排层状态 |
-| `ROBOTS.md` | Fleet shared 工作区 | 机器人实例目录摘要 |
+| 进入上下文逻辑 | 文件 | 所属工作区 | 功能 |
+|------|------|------|------|
+| 始终进入 agent system prompt | `AGENTS.md` | Agent workspace | 项目级运行规则 |
+| 始终进入 agent system prompt | `SOUL.md` | Agent workspace | 身份与助手行为 |
+| 始终进入 agent system prompt | `USER.md` | Agent workspace | 用户偏好与长期画像 |
+| 始终进入 agent system prompt | `TOOLS.md` | Agent workspace | 工具使用规则 |
+| 始终进入 agent system prompt | `SKILLS.md` | Agent workspace | Agent skill 发现与加载规则 |
+| 存在时进入上下文；涉及 target 时按启用 target 过滤 | `EMBODIED.md` | Agent workspace | Target 能力的人类可读描述 |
+| 存在时作为状态进入上下文 | `ENVIRONMENT.md` | Agent/runtime workspace | 当前 target、场景、对象与环境状态 |
+| 存在时作为记忆/状态进入上下文 | `LESSONS.md` | Agent workspace | 运行经验与失败记录 |
+| 存在时作为任务状态进入上下文 | `TASK.md` | Agent workspace | 多步任务拆解状态 |
+| Runtime 协议；创建 session 前读取 | `RUNTIME.md` | Runtime workspace | 写入合法 runtime session 的说明 |
+| Runtime 协议；创建 session 前读取 | `TARGETS.md` | Runtime workspace | Target registry、endpoint、adapter、config 与支持的 skill runtime |
+| Runtime 协议；创建 session 前读取 | `SKILLRUNTIME.md` | Runtime workspace | Policy/builtin skill runtime 注册表与执行契约 |
+| Runtime 队列/状态 | `SESSIONS.md` | Runtime workspace | 执行会话队列与结果 |
 
 ---
 
@@ -492,7 +485,7 @@ paos minecraft say "挖5个橡木然后过来"
 让 Go2 先去门口巡检，再让机械臂把桌上的包裹抓起来准备交接。
 ```
 
-验证点：Agent 是否识别多个机器人实例、动作是否分发到正确机器人、`ROBOTS.md` 是否正确更新状态。
+验证点：Agent 是否识别目标 target，session 是否使用正确的 `target_ref`，`SESSIONS.md` 与 `ENVIRONMENT.md` 是否正确更新。
 
 ### Isaac Sim 环境操控
 
@@ -537,38 +530,38 @@ paos agent -m "deploy a VLA to pick up the red cube"
 2. 确认 `agents.defaults.model` 与对应 provider 配套
 3. 确保 API Key 格式正确，无多余空格
 
-### Watchdog 启动后没有 EMBODIED.md
+### Runtime 协议文件缺失
 
-**现象**：Critic 提示找不到 `EMBODIED.md`。
-
-**排查**：
-1. 确认已执行 `paos onboard`
-2. 确认 Watchdog 已成功启动
-3. 确认所选 driver 的 profile 文件存在且可读取
-4. Fleet 模式下确认查看的是目标机器人的工作区
-
-### ACTION.md 有内容但动作没执行
+**现象**：找不到 `TARGETS.md`、`SKILLRUNTIME.md` 或 `SESSIONS.md`。
 
 **排查**：
-1. 确认对应 Watchdog 仍在运行
-2. 检查 `ACTION.md` 中 JSON 代码块格式是否完整
-3. 查看 Watchdog 终端日志是否出现驱动报错
-4. 检查 `driver-config` 是否缺失关键参数
+1. 确认 config 中 `runtime.enabled` 为 `true`
+2. 检查 `runtime.workspace` 是否指向独立目录
+3. 启动 `paos agent` / `paos gateway`，或用 `python scripts/init_runtime_workspace.py --workspace <path>` 手动初始化
+4. Fleet 模式下确认查看的是 shared/runtime workspace
 
-### 动作被 Critic 拒绝
+### SESSIONS.md 有 pending 但没有执行
 
 **排查**：
-1. 查看 `LESSONS.md` 中的失败原因
-2. 检查目标动作是否在 `EMBODIED.md` 的 Supported Actions 中声明
-3. 检查 `ENVIRONMENT.md` 中是否存在对应目标物体、地图信息或机器人连接状态
-4. 检查动作参数（坐标、关节角等）是否在物理约束范围内
+1. 确认 session watchdog 仍在运行
+2. 检查 session 的 `target_ref` 与 `skillruntime_ref` 是否存在
+3. 检查 `TARGETS.md` 中 target 是否 `enabled: true`
+4. 查看 Watchdog 日志是否出现 preflight 或 runtime 错误
+
+### Session 被 preflight 拒绝
+
+**排查**：
+1. 查看 `SESSIONS.md` 中该 session 的 result/error
+2. 检查 target 是否支持该 `skillruntime_ref`
+3. 检查 `SKILLRUNTIME.md` 中 observation/action contract 是否与 target runtime contract 兼容
+4. 检查 `ENVIRONMENT.md` 中是否存在必要目标物体、地图信息或连接状态
 
 ### Fleet 模式下任务没有派发到正确机器人
 
 **排查**：
 1. 检查配置中的 `robot_id`、`driver`、`workspace` 是否匹配
-2. 确认 Watchdog 是通过 `--robot-id` 启动
-3. 检查共享工作区的 `ROBOTS.md` 是否已正确生成
+2. 检查 `TARGETS.md` 中 target id、workspace 与 enabled 状态
+3. 检查 `SESSIONS.md` 中 session 的 `target_ref`
 4. 确认任务语义里明确了目标机器人
 
 ### 找不到 rekep_real 驱动

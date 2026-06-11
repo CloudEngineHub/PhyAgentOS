@@ -86,7 +86,7 @@ def _write_workspace(workspace: Path, args) -> None:
                     "target_kind": "simulation",
                     "enabled": True,
                     "workspace": "workspaces/libero_real",
-                    "supported_skills": ["pi05_libero_remote"],
+                    "supported_skillruntimes": ["pi05_libero_remote"],
                     "runtime": {
                         "target_runtime": "LiberoRemoteTargetProxy",
                         "target_endpoint": args.target_endpoint,
@@ -110,11 +110,11 @@ def _write_workspace(workspace: Path, args) -> None:
         },
     )
     write_yaml_block(
-        workspace / "SKILLS.md",
-        "Runtime Skills",
+        workspace / "SKILLRUNTIME.md",
+        "Runtime Skill Runtimes",
         {
             "version": "runtime_skill_registry_v1",
-            "skills": [
+            "skillruntimes": [
                 {
                     "id": "pi05_libero_remote",
                     "runtime": "OpenPISkillRuntime",
@@ -150,7 +150,7 @@ def _write_workspace(workspace: Path, args) -> None:
                 {
                     "session_id": f"libero_t{args.task_id}_i{args.init_state_id}",
                     "target_ref": "target://libero_real_remote",
-                    "skill_ref": "skill://pi05_libero_remote",
+                    "skillruntime_ref": "skillruntime://pi05_libero_remote",
                     "task_description": args.task_description,
                     "status": "pending",
                     "routing": {"target_endpoint": args.target_endpoint, "policy_endpoint": args.policy_endpoint},

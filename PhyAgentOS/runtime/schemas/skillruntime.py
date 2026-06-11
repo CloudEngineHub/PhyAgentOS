@@ -46,7 +46,7 @@ class TargetToolPolicy(BaseModel):
     allow_close_by_agent: bool = False
 
 
-class SkillSpec(BaseModel):
+class SkillRuntimeSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
@@ -66,6 +66,6 @@ class SkillSpec(BaseModel):
     requires: SkillRequirements = Field(default_factory=SkillRequirements)
 
 
-class SkillsDocument(BaseModel):
+class SkillRuntimeDocument(BaseModel):
     version: Literal["runtime_skill_registry_v1"] = "runtime_skill_registry_v1"
-    skills: list[SkillSpec] = Field(default_factory=list)
+    skillruntimes: list[SkillRuntimeSpec] = Field(default_factory=list)

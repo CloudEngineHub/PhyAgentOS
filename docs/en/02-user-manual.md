@@ -61,14 +61,13 @@ Shared state between the two is expressed through Markdown files in the workspac
 ### 2.2.3 A Typical Run Cycle
 
 1. Run `paos onboard` to initialize config and workspace
-2. Start Watchdog, which installs `EMBODIED.md` (robot capability declaration)
-3. Start `paos agent` or `paos gateway`
+2. Start `paos agent` or `paos gateway`
+3. When runtime is enabled, PhyAgentOS provisions the runtime workspace and starts the session watchdog
 4. User inputs a natural language task
-5. Agent reads workspace files like `ENVIRONMENT.md` for planning
-6. Critic validates actions against `EMBODIED.md` for safety and feasibility
-7. Validated actions are written to `ACTION.md` or `SESSIONS.md`
-8. Watchdog reads, parses, and executes actions via driver
-9. Watchdog writes back latest state to `ENVIRONMENT.md`
+5. Agent reads agent context files plus runtime state such as `TARGETS.md`, `SKILLRUNTIME.md`, and `ENVIRONMENT.md`
+6. Agent appends executable work to `SESSIONS.md`
+7. Watchdog claims a pending session, runs preflight, executes the target/skill runtime, and writes results and artifacts
+8. Runtime/perception writers refresh `ENVIRONMENT.md` as state changes
 
 ---
 
@@ -358,28 +357,17 @@ python hal/hal_watchdog.py --driver rekep_real
 #### When to Use
 
 - One Agent coordinates multiple robot instances
-- Separate shared environment from per-robot action queues
-- Explicit independent `EMBODIED.md` and `ACTION.md` per robot
+- Separate shared environment, target registry, and session queue
+- Manage execution through `TARGETS.md`, `SKILLRUNTIME.md`, and `SESSIONS.md`
 
 #### Startup Sequence
 
 1. Set `embodiments.mode = "fleet"`
 2. Run `paos onboard`
-3. Start one Watchdog per robot instance
-4. Start a single `paos agent`
+3. Start `paos agent` or `paos gateway`
+4. Runtime workspace provisioning and the session watchdog start automatically when runtime is enabled
 
 ```bash
-# Robot 1
-python hal/hal_watchdog.py \
-  --robot-id go2_edu_001 \
-  --driver-config examples/go2_driver_config.json
-
-# Robot 2
-python hal/hal_watchdog.py \
-  --robot-id xlerobot_lab_001 \
-  --driver-config examples/xlerobot_2wheels_remote.driver.json
-
-# Unified Agent
 paos agent
 ```
 
@@ -388,11 +376,11 @@ paos agent
 | File | Location | Purpose |
 |------|----------|---------|
 | `ENVIRONMENT.md` | shared/ | Global environment state |
-| `ROBOTS.md` | shared/ | Robot instance directory summary |
+| `TARGETS.md` | runtime/shared | Target registry |
+| `SKILLRUNTIME.md` | runtime/shared | Skill runtime registry |
+| `SESSIONS.md` | runtime/shared | Session queue and results |
 | `TASK.md` | shared/ | Multi-step task state |
 | `ORCHESTRATOR.md` | shared/ | Global orchestration state |
-| `EMBODIED.md` | per-robot/ | Per-robot runtime capability declaration |
-| `ACTION.md` | per-robot/ | Per-robot action queue |
 
 ---
 
@@ -440,7 +428,7 @@ paos minecraft say "mine 5 oak logs and come over"
 | Windows 9-step deployment | [deployment.md](../../scenarios/game/minecraft/en/deployment.md) |
 | Observation space schema | [deployment.md §3.3](../../scenarios/game/minecraft/en/deployment.md#33-observation-space) |
 | 16 action types | [deployment.md §4](../../scenarios/game/minecraft/en/deployment.md#4-action-space-16-types) |
-| TARGETS.md / SKILLS.md config | [deployment.md §5-6](../../scenarios/game/minecraft/en/deployment.md#5-targetsmd-configuration) |
+| TARGETS.md / SKILLRUNTIME.md config | [deployment.md §5-6](../../scenarios/game/minecraft/en/deployment.md#5-targetsmd-configuration) |
 | Agent → SESSIONS.md pipeline | [deployment.md §7](../../scenarios/game/minecraft/en/deployment.md#7-full-pipeline-agent-task-dispatch) |
 | CLI & chat control | [usage.md](../../scenarios/game/minecraft/en/usage.md) |
 | Bot teleporting | [usage.md §3](../../scenarios/game/minecraft/en/usage.md#3-bot-teleporting) |
@@ -449,19 +437,23 @@ paos minecraft say "mine 5 oak logs and come over"
 
 ---
 
-## 2.7 Runtime File Reference
+## 2.7 Protocol File Reference
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `ACTION.md` | Single or per-robot workspace | Pending action queue (JSON format) |
-| `EMBODIED.md` | Single or per-robot workspace | Current robot capabilities, constraints, and connection declarations |
-| `ENVIRONMENT.md` | Single or shared workspace | Current environment, objects, map, robot states |
-| `LESSONS.md` | Single or shared workspace | Failure experience recording after Critic rejections |
-| `TASK.md` | Single or shared workspace | Multi-step task decomposition state |
-| `SESSIONS.md` | Single or shared workspace | Execution session queue (new protocol) |
-| `TARGETS.md` | Shared workspace | Target (robot/simulation) registration index |
-| `ORCHESTRATOR.md` | Shared workspace | Orchestration layer state |
-| `ROBOTS.md` | Fleet shared workspace | Robot instance directory summary |
+| Context Loading | File | Location | Purpose |
+|------|------|----------|---------|
+| Always loaded into the agent system prompt | `AGENTS.md` | Agent workspace | Project-level operating rules |
+| Always loaded into the agent system prompt | `SOUL.md` | Agent workspace | Identity and assistant behavior |
+| Always loaded into the agent system prompt | `USER.md` | Agent workspace | User preferences and durable profile notes |
+| Always loaded into the agent system prompt | `TOOLS.md` | Agent workspace | Tool usage policy |
+| Always loaded into the agent system prompt | `SKILLS.md` | Agent workspace | Agent skill discovery and loading rules |
+| Loaded when present; filtered by enabled runtime targets where applicable | `EMBODIED.md` | Agent workspace | Human-readable target capability descriptions |
+| Loaded when present as state | `ENVIRONMENT.md` | Agent/runtime workspace | Current target, scene, object, and environment state |
+| Loaded when present as memory/state | `LESSONS.md` | Agent workspace | Operational lessons and failure notes |
+| Loaded when present as task state | `TASK.md` | Agent workspace | Multi-step task decomposition state |
+| Runtime protocol; read before scheduling sessions | `RUNTIME.md` | Runtime workspace | Instructions for writing valid runtime sessions |
+| Runtime protocol; read before scheduling sessions | `TARGETS.md` | Runtime workspace | Target registry, endpoints, adapters, configs, supported skill runtimes |
+| Runtime protocol; read before scheduling sessions | `SKILLRUNTIME.md` | Runtime workspace | Policy/builtin skill runtime registry and execution contracts |
+| Runtime queue/state | `SESSIONS.md` | Runtime workspace | Execution session queue and results |
 
 ---
 
@@ -497,7 +489,7 @@ Verify: Target semantic location exists in scene graph, current mobile robot sup
 Send Go2 to patrol the doorway first, then have the robot arm grab the package on the table for handoff.
 ```
 
-Verify: Agent recognizes multiple robot instances, actions dispatched to correct robot workspaces, `ROBOTS.md` correctly updates states.
+Verify: Agent recognizes the intended target, the session uses the correct `target_ref`, and `SESSIONS.md` / `ENVIRONMENT.md` update correctly.
 
 ### Isaac Sim Environment Manipulation
 
@@ -542,38 +534,38 @@ Customize your VLA checkpoint by editing the `vla` block in `examples/pipergo2_m
 2. Verify `agents.defaults.model` matches the provider
 3. Ensure API key format is correct with no extra whitespace
 
-### No EMBODIED.md After Watchdog Start
+### Runtime Protocol Files Missing
 
-**Symptom**: Critic reports `EMBODIED.md` not found.
-
-**Resolution**:
-1. Confirm `paos onboard` was executed
-2. Confirm Watchdog started successfully
-3. Verify the selected driver's profile file exists and is readable
-4. In Fleet mode, verify you're inspecting the correct robot's workspace
-
-### ACTION.md Has Content But No Execution
+**Symptom**: `TARGETS.md`, `SKILLRUNTIME.md`, or `SESSIONS.md` is missing.
 
 **Resolution**:
-1. Confirm the corresponding Watchdog is still running
-2. Check `ACTION.md` JSON code block format integrity
-3. Check Watchdog terminal output for driver errors
-4. Check if `driver-config` is missing critical parameters
+1. Confirm `runtime.enabled` is true in config
+2. Check whether `runtime.workspace` points to a separate directory
+3. Start `paos agent` / `paos gateway`, or initialize manually with `python scripts/init_runtime_workspace.py --workspace <path>`
+4. In Fleet mode, verify you're inspecting the shared/runtime workspace
 
-### Action Rejected by Critic
+### SESSIONS.md Has Pending Work But No Execution
 
 **Resolution**:
-1. First check `LESSONS.md` for failure reasons
-2. Check if target action is declared in `EMBODIED.md` Supported Actions
-3. Check `ENVIRONMENT.md` for the corresponding target object, map info, or robot connection state
-4. Verify action parameters (coordinates, joint angles) are within physical constraints
+1. Confirm the session watchdog is running
+2. Check that `target_ref` and `skillruntime_ref` exist
+3. Check that the target is `enabled: true` in `TARGETS.md`
+4. Check Watchdog output for preflight or runtime errors
+
+### Session Rejected by Preflight
+
+**Resolution**:
+1. Check the session result/error in `SESSIONS.md`
+2. Verify the target supports the requested `skillruntime_ref`
+3. Check that `SKILLRUNTIME.md` observation/action contracts match the target runtime contract
+4. Check `ENVIRONMENT.md` for required object, map, or connection state
 
 ### Fleet Mode Task Not Dispatched to Correct Robot
 
 **Resolution**:
 1. Verify `robot_id`, `driver`, `workspace` in config match
-2. Confirm Watchdog started with `--robot-id`
-3. Check shared workspace `ROBOTS.md` correctly generated
+2. Check target id, workspace, and enabled state in `TARGETS.md`
+3. Check the session `target_ref` in `SESSIONS.md`
 4. Confirm task semantics explicitly identify target robot
 
 ### rekep_real Driver Not Found

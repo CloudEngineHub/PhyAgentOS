@@ -114,7 +114,7 @@ class SessionSpec(BaseModel):
     parent_goal_id: str | None = None
     horizon: Literal["short_term", "long_term"] | None = None
     target_ref: str
-    skill_ref: str
+    skillruntime_ref: str
     task_description: str
     status: SessionStatus = SessionStatus.PENDING
     priority: Literal["low", "normal", "high"] = "normal"

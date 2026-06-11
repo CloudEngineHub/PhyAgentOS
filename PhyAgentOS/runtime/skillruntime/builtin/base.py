@@ -7,7 +7,7 @@ from typing import Literal
 
 from PhyAgentOS.runtime.schemas import AdapterPlan, TargetToolManifest
 from PhyAgentOS.runtime.sessions.models import SkillContext, SkillRuntimeResult
-from PhyAgentOS.runtime.skills.base import BaseSkillRuntime
+from PhyAgentOS.runtime.skillruntime.base import BaseSkillRuntime
 
 
 class BuiltinSkillRuntime(BaseSkillRuntime):

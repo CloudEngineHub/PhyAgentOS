@@ -34,7 +34,7 @@ class EpisodeWriter:
         self,
         session: SessionSpec,
         target: TargetSpec,
-        skill_id: str,
+        skillruntime_id: str,
         result: SessionResult,
     ) -> Path:
         artifact_dir = self.artifacts_root / session.session_id
@@ -44,7 +44,7 @@ class EpisodeWriter:
         payload = {
             "session_id": session.session_id,
             "target_id": target.id,
-            "skill_id": skill_id,
+            "skillruntime_id": skillruntime_id,
             "benchmark": benchmark_episode,
             "success": result.success,
             "status": result.status,

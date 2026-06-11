@@ -7,7 +7,7 @@ from typing import Any
 
 from PhyAgentOS.runtime.perception.config_resolver import ResolvedPerceptionPlan
 from PhyAgentOS.runtime.perception.perception_runtime import PerceptionRuntime
-from PhyAgentOS.runtime.schemas import AdapterPlan, SessionSpec, SkillSpec, TargetSpec, TargetToolManifest
+from PhyAgentOS.runtime.schemas import AdapterPlan, SessionSpec, SkillRuntimeSpec, TargetSpec, TargetToolManifest
 from PhyAgentOS.runtime.sessions.models import EnvironmentRequest, EnvironmentSnapshot, RuntimeObservation, SessionState
 
 
@@ -17,7 +17,7 @@ class TargetSessionHandle:
         *,
         session: SessionSpec,
         target_spec: TargetSpec,
-        skill_spec: SkillSpec,
+        skillruntime_spec: SkillRuntimeSpec,
         target,
         target_adapter,
         action_bridges,
@@ -30,7 +30,7 @@ class TargetSessionHandle:
     ):
         self.session = session
         self.target_spec = target_spec
-        self.skill_spec = skill_spec
+        self.skillruntime_spec = skillruntime_spec
         self._target = target
         self.target_adapter = target_adapter
         self.action_bridges = list(action_bridges)
@@ -120,8 +120,8 @@ class TargetSessionHandle:
         return (
             self.target_spec.observation.observation_type == "empty"
             and self.target_spec.observation.empty_observation_allowed
-            and self.skill_spec.observation_contract.observation_type == "empty"
-            and self.skill_spec.observation_contract.empty_observation_allowed
+            and self.skillruntime_spec.observation_contract.observation_type == "empty"
+            and self.skillruntime_spec.observation_contract.empty_observation_allowed
         )
 
     def _target_info(self) -> dict[str, Any]:

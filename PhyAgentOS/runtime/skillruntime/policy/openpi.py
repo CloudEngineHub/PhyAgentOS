@@ -8,7 +8,7 @@ from PhyAgentOS.runtime.adapters.factory import build_policy_adapter
 from PhyAgentOS.runtime.policy.base_client import BasePolicyClient
 from PhyAgentOS.runtime.schemas import AdapterPlan
 from PhyAgentOS.runtime.sessions.models import EnvironmentRequest, SkillContext, SkillRuntimeResult
-from PhyAgentOS.runtime.skills.policy.base import PolicySkillRuntime
+from PhyAgentOS.runtime.skillruntime.policy.base import PolicySkillRuntime
 from PhyAgentOS.runtime.watchdog.errors import PolicyProtocolError
 
 
@@ -47,9 +47,9 @@ class OpenPISkillRuntime(PolicySkillRuntime):
 
         for step_idx in range(skill_ctx.session.execution.max_steps):
             observation = target_handle.observe()
-            if step_idx == 0 and skill_ctx.skill.requires.environment_outputs:
+            if step_idx == 0 and skill_ctx.skillruntime.requires.environment_outputs:
                 target_handle.request_environment_refresh(
-                    EnvironmentRequest(requested_outputs=list(skill_ctx.skill.requires.environment_outputs))
+                    EnvironmentRequest(requested_outputs=list(skill_ctx.skillruntime.requires.environment_outputs))
                 )
             session_ctx["source_observation_id"] = observation.data.get("observation_id")
             policy_input = policy_adapter.to_policy_input(observation.data, session_ctx)
@@ -86,7 +86,7 @@ class OpenPISkillRuntime(PolicySkillRuntime):
         )
 
     def _policy_action_contract(self, skill_ctx: SkillContext, action_dim: int) -> dict:
-        action_contract = skill_ctx.skill.output_contract.get("action", {})
+        action_contract = skill_ctx.skillruntime.output_contract.get("action", {})
         if action_contract:
             return action_contract
         return {

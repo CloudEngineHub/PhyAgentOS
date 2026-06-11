@@ -19,8 +19,8 @@ class RuntimeWorkspacePaths:
         return self.workspace / "TARGETS.md"
 
     @property
-    def skills(self) -> Path:
-        return self.workspace / "SKILLS.md"
+    def skillruntimes(self) -> Path:
+        return self.workspace / "SKILLRUNTIME.md"
 
     @property
     def sessions(self) -> Path:

@@ -78,7 +78,7 @@ PhyAgentOS 有两种典型运行拓扑：
 2. 启动 `paos agent` 或 `paos gateway`
 3. Agent 自动创建/刷新 runtime workspace，并启动 session watchdog
 4. 用户输入自然语言任务
-5. Agent 读取 `TARGETS.md`、`SKILLS.md`、`ENVIRONMENT.md` 等工作区文件进行规划
+5. Agent 读取 `TARGETS.md`、`SKILLRUNTIME.md`、`ENVIRONMENT.md` 等工作区文件进行规划
 6. Agent 将可执行任务追加到 `SESSIONS.md`
 7. Watchdog claim pending session，执行 preflight、运行 target/skill，并写回 result、artifact 与环境状态
 
@@ -215,7 +215,7 @@ conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_s
 第一次调试时，建议同时关注这些文件：
 
 - `TARGETS.md`：target 是否启用、endpoint 是否正确
-- `SKILLS.md`：目标 skill 是否存在
+- `SKILLRUNTIME.md`：目标 skill runtime 是否存在
 - `SESSIONS.md`：Agent 是否追加 pending session，watchdog 是否写回结果
 - `ENVIRONMENT.md`：target/runtime 是否写回环境状态
 - `LESSONS.md`：preflight 或执行失败时是否记录经验
@@ -386,8 +386,8 @@ python hal/hal_watchdog.py --driver rekep_real
 当你需要：
 
 - 让一个 Agent 面向多个机器人实例协同规划
-- 将共享环境与机器人私有动作队列分开维护
-- 明确每台机器人的独立 `EMBODIED.md` 与 `ACTION.md`
+- 将共享环境、target registry 与 session 队列分开维护
+- 通过 `TARGETS.md`、`SKILLRUNTIME.md` 与 `SESSIONS.md` 管理多个 target 的执行入口
 
 就应该启用 Fleet 模式。
 
@@ -428,41 +428,33 @@ paos onboard
 
 1. 配置 `embodiments.mode = "fleet"`
 2. 运行 `paos onboard`
-3. 为每个机器人实例启动一个 Watchdog
-4. 再启动一个 `paos agent` 或 `paos gateway`
+3. 启动 `paos agent` 或 `paos gateway`
+4. Runtime workspace 会按配置创建，session watchdog 会在 runtime 启用时自动启动
 
 例如：
 
 ```bash
-python hal/hal_watchdog.py \
-  --robot-id go2_edu_001 \
-  --driver-config examples/go2_driver_config.json
-
-python hal/hal_watchdog.py \
-  --robot-id xlerobot_lab_001 \
-  --driver-config examples/xlerobot_2wheels_remote.driver.json
-
 paos agent
 ```
 
-> 在 Fleet 模式下，`--robot-id` 会决定该 Watchdog 绑定哪个机器人实例；对应实例的 `driver` 会从配置中解析。
+> Runtime 是否启用、runtime workspace 是否独立，由 config 的 `runtime.enabled` 与 `runtime.workspace` 控制。
 
 ### 8.4 Fleet 模式下你会看到哪些文件
 
-- `shared/ENVIRONMENT.md`：全局环境状态
-- `shared/ROBOTS.md`：机器人目录摘要
+- `shared/ENVIRONMENT.md`：全局环境与 target 状态
+- `shared/TARGETS.md`：target registry
+- `shared/SKILLRUNTIME.md`：可执行 skill runtime registry
+- `shared/SESSIONS.md`：session 队列与结果
 - `shared/TASK.md`：多步任务状态
 - `shared/ORCHESTRATOR.md`：全局编排状态
-- `<robot_id>/EMBODIED.md`：该机器人自己的运行时能力声明
-- `<robot_id>/ACTION.md`：该机器人自己的动作队列
 
 ### 8.5 Fleet 模式下的交互注意事项
 
 在多机器人模式下，面向具身动作的请求通常需要明确目标机器人。简而言之：
 
 - 用户指令应尽量说明“由哪台机器人执行”
-- 如果上层工具需要 `robot_id`，缺失时动作可能被拒绝或无法派发
-- `ROBOTS.md` 与 `ENVIRONMENT.md` 是理解当前机器人编队状态的第一入口
+- target 是否启用、支持哪些 skill runtime，以 `TARGETS.md` 为准
+- `TARGETS.md`、`SESSIONS.md` 与 `ENVIRONMENT.md` 是理解当前编队状态的第一入口
 
 ## 9. 运行时 Markdown 文件职责
 
@@ -470,13 +462,15 @@ paos agent
 
 | 文件 | 典型位置 | 作用 |
 | --- | --- | --- |
-| `ACTION.md` | 单机工作区或机器人工作区 | 待执行动作队列 |
-| `EMBODIED.md` | 单机工作区或机器人工作区 | 当前机器人能力、约束与连接声明 |
-| `ENVIRONMENT.md` | 单机工作区或共享工作区 | 当前环境、对象、地图、机器人状态 |
-| `LESSONS.md` | 单机工作区或共享工作区 | Critic 拒绝动作后的失败经验记录 |
-| `TASK.md` | 单机工作区或共享工作区 | 多步任务拆解状态 |
-| `ORCHESTRATOR.md` | 单机工作区或共享工作区 | 编排层状态 |
-| `ROBOTS.md` | Fleet 共享工作区 | 机器人实例目录摘要 |
+| `SKILLS.md` | Agent workspace | 面向 Agent 的 skill 发现与加载规则 |
+| `EMBODIED.md` | Agent workspace | Target 能力的人类可读描述 |
+| `ENVIRONMENT.md` | Agent/runtime workspace | 当前 target、场景、对象与环境状态 |
+| `LESSONS.md` | Agent workspace | 运行经验与失败记录 |
+| `TASK.md` | Agent workspace | 多步任务拆解状态 |
+| `TARGETS.md` | Runtime workspace | Target registry 与 endpoint/adapter/config 引用 |
+| `SKILLRUNTIME.md` | Runtime workspace | 可执行 skill runtime registry 与执行契约 |
+| `SESSIONS.md` | Runtime workspace | 执行 session 队列与结果 |
+| `ORCHESTRATOR.md` | Agent workspace | 编排层状态 |
 
 如果你想进一步理解这些文件如何在不同模式下协同，请阅读 [COMMUNICATION.md](../user_development_guide/COMMUNICATION.md)。
 
@@ -502,8 +496,9 @@ paos agent
 适合验证：
 
 - 目标物体是否已出现在环境状态中
-- 当前机器人 profile 是否声明了 `pick_up` / `put_down` 等动作
-- Watchdog 是否成功执行动作并清空 `ACTION.md`
+- `TARGETS.md` 是否启用了对应 target
+- `SKILLRUNTIME.md` 是否声明了兼容的 policy/builtin runtime
+- Watchdog 是否成功执行 session 并在 `SESSIONS.md` 写回结果
 
 ### 10.3 移动机器人导航类任务
 
@@ -525,8 +520,8 @@ paos agent
 适合验证：
 
 - Agent 是否识别多个机器人实例
-- 动作是否被分发到正确的机器人工作区
-- `ROBOTS.md` 与 `ENVIRONMENT.md` 是否正确更新状态
+- session 是否绑定到正确 target
+- `SESSIONS.md` 与 `ENVIRONMENT.md` 是否正确更新状态
 
 ## 11. 常见问题与排查建议
 
@@ -540,43 +535,45 @@ paos agent
 - 确认 `agents.defaults.model` 与对应 provider 配套
 - 确认正确填写了 `providers.<name>.api_key`
 
-### 11.2 Watchdog 启动后没有 `EMBODIED.md`
+### 11.2 Runtime 启动后没有协议文件
 
-现象：Critic 提示找不到 `EMBODIED.md`。
+现象：找不到 `TARGETS.md`、`SKILLRUNTIME.md` 或 `SESSIONS.md`。
 
 排查建议：
 
-- 确认已执行 `paos onboard`
-- 确认 Watchdog 已成功启动
-- 确认所选 driver 的 profile 文件存在且可读取
-- 若使用 Fleet 模式，确认你查看的是目标机器人的工作区
+- 确认 config 中 `runtime.enabled` 为 `true`
+- 确认 `runtime.workspace` 是否指向独立目录
+- 启动 `paos agent` / `paos gateway`，或用 `python scripts/init_runtime_workspace.py --workspace <path>` 手动初始化
+- 若使用 Fleet 模式，确认你查看的是 shared/runtime workspace
 
-### 11.3 `ACTION.md` 有内容但动作没执行
+### 11.3 `SESSIONS.md` 有 pending 但没有执行
 
 排查建议：
 
 - 确认对应 Watchdog 仍在运行
-- 检查 `ACTION.md` 中 JSON 代码块格式是否完整
-- 查看 Watchdog 终端日志是否出现驱动报错
-- 检查 `driver-config` 是否缺失关键参数
+- 检查 session 的 `target_ref` 与 `skillruntime_ref` 是否存在
+- 检查 `TARGETS.md` 中 target 是否 `enabled: true`
+- 查看 Watchdog 终端日志是否出现 preflight 或 runtime 错误
+- 检查 runtime contract、sensor config、policy endpoint 是否缺失
 
-### 11.4 动作被 Critic 拒绝
+### 11.4 Session 被 preflight 拒绝
 
-现象：Agent 返回动作无效或不安全。
+现象：session 状态变成 `rejected`。
 
 排查建议：
 
-- 先查看 `LESSONS.md`
-- 再检查目标动作是否已在 `EMBODIED.md` 的 Supported Actions 中声明
-- 检查 `ENVIRONMENT.md` 中是否存在对应目标物体、地图信息或机器人连接状态
+- 先查看 `SESSIONS.md` 中该 session 的 result/error
+- 检查 target 是否支持该 `skillruntime_ref`
+- 检查 `SKILLRUNTIME.md` 中 observation/action contract 是否与 target contract 兼容
+- 检查 `ENVIRONMENT.md` 中是否存在必要目标物体、地图信息或连接状态
 
 ### 11.5 Fleet 模式下任务没有派发到正确机器人
 
 排查建议：
 
 - 检查配置中的 `robot_id`、`driver`、`workspace` 是否匹配
-- 确认 Watchdog 是通过 `--robot-id` 启动
-- 检查共享工作区的 `ROBOTS.md` 是否已正确生成
+- 检查 `TARGETS.md` 中的 target id、workspace 与 enabled 状态
+- 检查 `SESSIONS.md` 中 session 的 `target_ref`
 - 确认任务语义里明确了目标机器人
 
 ### 11.6 找不到 `rekep_real` 驱动
