@@ -1,24 +1,21 @@
 /**
- * mineflayer bridge — HTTP API for Minecraft bot.
+ * mineflayer bridge — HTTP API + 3D viewer for Minecraft bot.
  *
  * Usage:
  *   node bridge_server.js
  *
- * Env vars: MC_HOST, MC_PORT, BOT_NAME, MC_VERSION, API_PORT
+ * Env vars: MC_HOST, MC_PORT, BOT_NAME, MC_VERSION, API_PORT, VIEWER_PORT
  *
  * Endpoints:
  *   GET  /health        → bot status
  *   GET  /state         → bot position, nearby blocks, entities, chat
  *   POST /action        → execute one action
- *
- * PhyAgentOS 集成: 此 bridge 运行在 Windows 端，通过 ngrok 暴露公网。
- * Linux 端的 MinecraftTarget 通过 HTTP 连接此 bridge；
- * paos agent --workspace workspaces/minecraft 自动管理 watchdog + skill runtime。
  */
 
 const express = require('express');
 const mineflayer = require('mineflayer');
 const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+const collectBlock = require('mineflayer-collectblock');
 const app = express();
 app.use(express.json());
 
@@ -37,10 +34,18 @@ const MC_VERSION = process.env.MC_VERSION || '1.20.4';
 function createBot() {
     bot = mineflayer.createBot({ host: HOST, port: PORT, username: BOT_NAME, version: MC_VERSION });
     bot.loadPlugin(pathfinder);
+    bot.loadPlugin(collectBlock.plugin);
 
     bot.on('spawn', () => {
         botSpawned = true; spawnTime = Date.now();
         console.log(`[bridge] Bot spawned: ${BOT_NAME} (MC ${MC_VERSION})`);
+
+        // mineflayer-collectblock init
+        if (bot.collectBlock) {
+            if (!bot.collectBlock.chestLocations) bot.collectBlock.chestLocations = new Map();
+            if (!bot.collectBlock.chestsToOpen) bot.collectBlock.chestsToOpen = [];
+            if (!bot.collectBlock.tempChests) bot.collectBlock.tempChests = new Map();
+        }
     });
 
     bot.on('death', () => { botSpawned = false; setTimeout(() => { if (bot) bot.respawn(); }, 3000); });
@@ -187,51 +192,20 @@ function executeAction(action) {
                 case 'drop': { const it = p.slot != null ? bot.inventory.slots[parseInt(p.slot)] : bot.inventory.slots[bot.quickBarSlot]; if (!it) return resolve({ ok: false, result: 'nothing to drop' }); bot.tossStack(it); resolve({ ok: true, result: `dropped ${it.name}` }); break; }
                 case 'chat': { const m = String(p.message || ''); if (!m) return resolve({ ok: false, result: 'empty' }); bot.chat(m); resolve({ ok: true, result: `sent: ${m}` }); break; }
                 case 'collect': {
-                    (async () => {
-                        try {
-                            const blockType = p.block_type;
-                            const count = parseInt(p.count || 1);
-
-                            // Validate the block name exists in minecraft-data
-                            const mcData = require('minecraft-data')(bot.version);
-                            const block = mcData.blocksByName[blockType];
-                            if (!block) return resolve({ ok: false, result: `unknown block: ${blockType}` });
-
-                            let collected = 0;
-                            for (let i = 0; i < count; i++) {
-                                // Use name-based matching (more reliable than numeric ID)
-                                const target = bot.findBlock({
-                                    matching: (b) => b.name === blockType,
-                                    maxDistance: 64,
-                                    count: 1,
-                                });
-                                if (!target) {
-                                    if (collected === 0) return resolve({ ok: false, result: `no ${blockType} found within 64 blocks` });
-                                    return resolve({ ok: true, result: `collected ${collected}x ${blockType} (no more found)` });
-                                }
-                                console.log(`[bridge] collect ${blockType} ${i + 1}/${count}: at (${target.position.x.toFixed(1)}, ${target.position.y.toFixed(1)}, ${target.position.z.toFixed(1)})`);
-
-                                try {
-                                    bot.pathfinder.setMovements(new Movements(bot));
-                                    await bot.pathfinder.goto(new goals.GoalGetToBlock(target.position.x, target.position.y, target.position.z));
-                                } catch (pathErr) {
-                                    console.log(`[bridge] pathfinder failed: ${pathErr.message}`);
-                                    continue;
-                                }
-
-                                try {
-                                    await bot.dig(target);
-                                    collected++;
-                                } catch (digErr) {
-                                    console.log(`[bridge] dig failed: ${digErr.message}`);
-                                    continue;
-                                }
-                            }
-                            resolve({ ok: true, result: `collected ${collected}x ${blockType}` });
-                        } catch (e) {
-                            resolve({ ok: false, result: e.message });
-                        }
-                    })();
+                    const mcData = require('minecraft-data')(bot.version);
+                    const it = mcData.itemsByName[p.block_type] || mcData.blocksByName[p.block_type];
+                    if (!it) return resolve({ ok: false, result: `unknown: ${p.block_type}` });
+                    console.log(`[bridge] collect: ${p.block_type} x${p.count} (id=${it.id})`);
+                    try {
+                        bot.collectBlock.collect(it, { count: parseInt(p.count || 1) }, (e) => {
+                            if (e) console.log(`[bridge] collect failed: ${e.message}`);
+                            else console.log(`[bridge] collect done: ${p.count}x ${p.block_type}`);
+                            resolve(e ? { ok: false, result: e.message } : { ok: true, result: `collected ${p.count}x ${p.block_type}` });
+                        });
+                    } catch (e2) {
+                        console.log(`[bridge] collectBlock threw: ${e2.message}`);
+                        resolve({ ok: false, result: `collectBlock error: ${e2.message}` });
+                    }
                     break;
                 }
                 case 'equip': { const item = bot.inventory.items().find(i => i.name === p.item); if (!item) return resolve({ ok: false, result: `no ${p.item}` }); bot.equip(item, p.destination || 'hand', (e) => resolve(e ? { ok: false, result: e.message } : { ok: true, result: 'ok' })); break; }

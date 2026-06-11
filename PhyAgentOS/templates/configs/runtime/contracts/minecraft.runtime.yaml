@@ -2,24 +2,24 @@ version: runtime_target_contract_v1
 target_id: minecraft_java_env
 target_adapter: target_adapter://minecraft_adapter
 observation:
-  schema_source: sensor_config_ref
+  schema_source: target.describe
   require_describe_observation_schema: false
   allow_extra_channels: true
   timestamp_required: false
 action_contract:
-  id: minecraft_java_env_action_v1
+  id: minecraft_tool_action_v1
   accepted_representations:
-    - minecraft_java_action
+    - target_tool_call
   shape:
-    - T
+    - 1
     - 1
   dtype: object
   normalized: false
-  frame: base
-  control_mode: discrete_action
-  control_hz: 20
+  frame: world
+  control_mode: target_tool_call
+  control_hz: 5
   components:
-    - {name: action, unit: discrete}
+    - {name: command, unit: tool_call}
   chunk:
     max_chunk_size: 1
     preferred_chunk_size: 1
@@ -31,4 +31,5 @@ safety:
   stop_on_timeout: true
 capabilities:
   available_bridges: []
-  tf_frames: []
+  tool_surface:
+    - minecraft_navigate

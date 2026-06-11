@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from PhyAgentOS.runtime.communication.target_ws_client import TargetWSClient
 from PhyAgentOS.runtime.schemas import TargetSpec
-from PhyAgentOS.runtime.skills.base import BaseSkillRuntime
-from PhyAgentOS.runtime.skills.game.minecraft_skill_runtime import MinecraftSkillRuntime
-from PhyAgentOS.runtime.skills.policy import OpenPISkillRuntime
+from PhyAgentOS.runtime.skillruntime.base import BaseSkillRuntime
+from PhyAgentOS.runtime.skillruntime.policy import OpenPISkillRuntime
+from PhyAgentOS.runtime.communication.target_ws_client import TargetWSClient
 from PhyAgentOS.runtime.targets.base import BaseRolloutTarget
 from PhyAgentOS.runtime.targets.factory import (
     build_target,
@@ -16,6 +15,7 @@ from PhyAgentOS.runtime.targets.factory import (
     register_remote_target_runtime,
 )
 from PhyAgentOS.runtime.watchdog.errors import SchemaValidationError
+
 
 SkillFactory = Callable[[], BaseSkillRuntime]
 LocalTargetFactory = Callable[[TargetSpec], BaseRolloutTarget]
@@ -58,4 +58,3 @@ class SkillRuntimeRegistry:
 
 
 register_skill_runtime("OpenPISkillRuntime", OpenPISkillRuntime)
-register_skill_runtime("MinecraftSkillRuntime", MinecraftSkillRuntime)

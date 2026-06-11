@@ -11,16 +11,10 @@ from PhyAgentOS.runtime.watchdog.errors import AdapterError
 
 
 class SafetyClampBridge(BaseActionBridge):
-    """Validate numeric action chunks.  Dict-based game actions are passed through
-    unchanged — they carry their own semantics and cannot be clamped numerically."""
+    """Validate numeric action chunks without changing action semantics."""
 
     def apply(self, action_chunk: dict[str, Any], target_info: dict[str, Any]) -> dict[str, Any]:
-        actions = action_chunk.get("actions")
-        if isinstance(actions, list) and all(isinstance(a, dict) for a in actions):
-            # Dict-based actions (game targets like Minecraft) — pass through.
-            return action_chunk
-
-        actions = np.asarray(actions, dtype=np.float32)
+        actions = np.asarray(action_chunk.get("actions"), dtype=np.float32)
         if actions.ndim != 2:
             raise AdapterError(f"actions must have shape [T,A], got {actions.shape}")
         if not np.isfinite(actions).all():

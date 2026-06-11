@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from dataclasses import dataclass, field
 from importlib.resources import files as pkg_files
 from pathlib import Path
@@ -15,10 +16,12 @@ from PhyAgentOS.runtime.state_io.atomic_file import atomic_write_text
 from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block, write_yaml_block
 from PhyAgentOS.runtime.watchdog.supervisor import WatchdogSupervisor
 
-RUNTIME_TEMPLATE_NAMES = ("TARGETS.md", "SKILLS.md")
+RUNTIME_TEMPLATE_NAMES = ("TARGETS.md", "SKILLRUNTIME.md")
 RUNTIME_CONFIG_TEMPLATE_NAMES = (
+    "configs/runtime/contracts/dummy_sim.runtime.yaml",
     "configs/runtime/contracts/libero_real.runtime.yaml",
     "configs/runtime/contracts/minecraft.runtime.yaml",
+    "configs/runtime/sensors/dummy_sim.sensors.yaml",
 )
 _RUNTIME_INSTRUCTIONS = """# Runtime Protocol
 
@@ -28,7 +31,7 @@ runtime sessions. Do not use this file as runtime state.
 ## Runtime Files
 
 - `TARGETS.md`: user-maintained target registry.
-- `SKILLS.md`: available runtime skills.
+- `SKILLRUNTIME.md`: available runtime skill runtimes.
 - `SESSIONS.md`: runtime session queue; the watchdog claims `pending` sessions.
 - `ENVIRONMENT.md`: runtime environment state. It is created empty, then the
   runtime manager writes a target registry snapshot. Scene/object state is
@@ -36,10 +39,8 @@ runtime sessions. Do not use this file as runtime state.
 
 ## Creating A Session
 
-When the user asks to execute an enabled runtime target, first read the current
-`SESSIONS.md`, then use `write_file` (NOT `edit_file`) to rewrite the entire
-file with your new session appended to the `sessions` list. Keep existing
-sessions and results intact.
+When the user asks to execute an enabled runtime target, append one item to the
+`sessions` list in `SESSIONS.md`. Keep existing sessions and results intact.
 
 Required shape:
 
@@ -49,7 +50,7 @@ sessions:
   - session_id: unique_short_id
     goal_id: optional_goal_id
     target_ref: target://target_id_from_TARGETS
-    skill_ref: skill://skill_id_from_SKILLS
+    skillruntime_ref: skillruntime://skillruntime_id_from_SKILLRUNTIME
     task_description: user-facing task description
     status: pending
     priority: normal
@@ -84,20 +85,15 @@ sessions:
 
 Rules:
 
-- Read `TARGETS.md` and `SKILLS.md` before creating a session. Read
+- Read `TARGETS.md` and `SKILLRUNTIME.md` before creating a session. Read
   `ENVIRONMENT.md` for the latest target runtime snapshot.
 - Use only targets whose `TARGETS.md` entry has `enabled: true`.
-- `target_ref` must match an id in `TARGETS.md`; `skill_ref` must be listed in
-  that target's `supported_skills`.
+- `target_ref` must match an id in `TARGETS.md`; `skillruntime_ref` must be listed in
+  that target's `supported_skillruntimes`.
 - Use endpoint values declared in `TARGETS.md` unless the user explicitly
   provides a different endpoint.
 - Do not manually edit `ENVIRONMENT.md`; it is runtime state managed by
   PhyAgentOS.
-- Each action in `perception_queries` must use `type` (not `action`) for the
-  action name, and `params` for parameters. Example:
-  `{type: move, params: {forward: 5}}` for relative movement, or
-  `{type: collect, params: {block_type: oak_log, count: 5}}`.
-  See `EMBODIED.md` for the full list of supported actions.
 """
 
 
@@ -127,7 +123,6 @@ class RuntimeWorkspaceManager:
         self.workspace.mkdir(parents=True, exist_ok=True)
         templates = pkg_files("PhyAgentOS") / "templates"
         self._copy_missing_templates(templates, report)
-        self._deploy_embodied_from_targets(templates, report)
         self.write_runtime_instructions(report)
         self._ensure_empty_sessions(report)
         self._ensure_empty_environment(report)
@@ -173,38 +168,6 @@ class RuntimeWorkspaceManager:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
             report.created.append(name)
-
-    _GAME_EMBODIED_MAP = {"minecraft_java_env": "configs/runtime/embodied/minecraft.md"}
-
-    def _deploy_embodied_from_targets(
-        self, templates: Any, report: RuntimeWorkspaceReport
-    ) -> None:
-        targets_path = self.workspace / "TARGETS.md"
-        if not targets_path.exists():
-            return
-        try:
-            document = read_yaml_block(targets_path)
-        except Exception:
-            return
-        targets = document.get("targets")
-        if not isinstance(targets, list):
-            return
-        target_ids = {
-            t["id"] for t in targets if isinstance(t, dict) and isinstance(t.get("id"), str)
-        }
-        for target_id, embodied_src_name in self._GAME_EMBODIED_MAP.items():
-            if target_id not in target_ids:
-                continue
-            src = templates / embodied_src_name
-            if not src.exists():
-                continue
-            dest = self.workspace / "EMBODIED.md"
-            content = src.read_text(encoding="utf-8")
-            existed = dest.exists()
-            if existed and dest.read_text(encoding="utf-8") == content:
-                continue
-            dest.write_text(content, encoding="utf-8")
-            (report.updated if existed else report.created).append("EMBODIED.md")
 
     def _ensure_empty_sessions(self, report: RuntimeWorkspaceReport) -> None:
         sessions_path = self.workspace / "SESSIONS.md"
@@ -307,31 +270,15 @@ class RuntimeWorkspaceManager:
         config = target.get("config") if isinstance(target.get("config"), dict) else {}
         enabled = bool(target.get("enabled", True))
         endpoint = runtime.get("target_endpoint")
-        target_class = target.get("target_class")
-        if enabled:
-            if target_class == "local":
-                # Local targets are "configured" only when config block
-                # contains actual values (not just default scaffolding).
-                has_config = any(
-                    v for v in config.values()
-                    if isinstance(v, str) and v.strip()
-                )
-                status = "configured" if has_config else "unconfigured"
-            elif endpoint:
-                status = "configured"
-            else:
-                status = "unconfigured"
-        else:
-            status = "disabled"
         return {
             "target_id": target.get("id"),
             "enabled": enabled,
-            "target_class": target_class,
+            "target_class": target.get("target_class"),
             "target_kind": target.get("target_kind"),
             "workspace": target.get("workspace"),
-            "supported_skills": list(target.get("supported_skills") or []),
+            "supported_skillruntimes": list(target.get("supported_skillruntimes") or []),
             "connection_state": {
-                "status": status,
+                "status": "disabled" if not enabled else ("configured" if endpoint else "unconfigured"),
                 "endpoint": endpoint,
                 "checked_at": now,
                 "source": "TARGETS.md",
