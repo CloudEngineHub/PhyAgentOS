@@ -23,10 +23,12 @@ class SkillsLoader:
         workspace: Path,
         builtin_skills_dir: Path | None = None,
         *,
+        runtime_workspace: Path | None = None,
         runtime_enabled: bool = True,
         runtime_target_enabled: dict[str, bool] | None = None,
     ):
         self.workspace = workspace
+        self.runtime_workspace = runtime_workspace or workspace
         self.workspace_skills = workspace / "skills"
         self.builtin_skills = builtin_skills_dir or BUILTIN_SKILLS_DIR
         self.runtime_enabled = runtime_enabled
@@ -223,8 +225,8 @@ class SkillsLoader:
         try:
             from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block
 
-            targets_doc = read_yaml_block(self.workspace / "TARGETS.md")
-            skillruntimes_doc = read_yaml_block(self.workspace / "SKILLRUNTIME.md")
+            targets_doc = read_yaml_block(self.runtime_workspace / "TARGETS.md")
+            skillruntimes_doc = read_yaml_block(self.runtime_workspace / "SKILLRUNTIME.md")
         except Exception:
             return "TARGETS.md or SKILLRUNTIME.md missing or invalid"
 

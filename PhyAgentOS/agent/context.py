@@ -46,6 +46,7 @@ class ContextBuilder:
         self.memory = MemoryStore(workspace)
         self.skills = SkillsLoader(
             workspace,
+            runtime_workspace=self.runtime_workspace,
             runtime_enabled=runtime_enabled,
             runtime_target_enabled=self.runtime_target_enabled,
         )
@@ -98,6 +99,14 @@ Skills with available="false" need dependencies installed first - you can try in
 - Use file tools when they are simpler or more reliable than shell commands.
 """
 
+        runtime_policy = ""
+        if self.runtime_enabled:
+            runtime_policy = (
+                "- Runtime execution uses the session protocol. Read `RUNTIME.md`, "
+                "`TARGETS.md`, and `SKILLRUNTIME.md` before appending executable "
+                "work to `SESSIONS.md`."
+            )
+
         return f"""# PhyAgentOS 🍞
 
 You are PhyAgentOS, a helpful AI assistant.
@@ -119,7 +128,7 @@ Your workspace is at: {workspace_path}
 - After writing or editing a file, re-read it if accuracy matters.
 - If a tool call fails, analyze the error before retrying with a different approach.
 - Ask for clarification when the request is ambiguous.
-- Runtime execution uses the session protocol. Read `RUNTIME.md`, `TARGETS.md`, and `SKILLRUNTIME.md` before appending executable work to `SESSIONS.md`.
+{runtime_policy}
 
 Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
 

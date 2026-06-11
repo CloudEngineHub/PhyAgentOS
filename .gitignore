@@ -23,3 +23,5 @@ nano.*.save
 SECURITY.md
 .kilo
 test
+tests/
+plan/
