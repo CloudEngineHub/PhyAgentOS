@@ -19,10 +19,10 @@ class ResultWriter:
         self,
         session: SessionSpec,
         target: TargetSpec,
-        skill_id: str,
+        skillruntime_id: str,
         result: SessionResult,
     ) -> SessionResult:
-        artifact_dir = self.episode_writer.write_episode(session, target, skill_id, result)
+        artifact_dir = self.episode_writer.write_episode(session, target, skillruntime_id, result)
         result.artifact_dir = str(artifact_dir.relative_to(self.workspace))
         return result
 
@@ -83,7 +83,7 @@ class ResultWriter:
         self,
         session: SessionSpec,
         target_id: str,
-        skill_id: str,
+        skillruntime_id: str,
         phase: str,
         error_code: str | None,
         summary: str,
@@ -102,7 +102,7 @@ class ResultWriter:
                 "phase": phase,
                 "error_code": error_code,
                 "target_id": target_id,
-                "skill_id": skill_id,
+                "skillruntime_id": skillruntime_id,
                 "summary": summary,
                 "metadata": metadata,
             }

@@ -16,7 +16,7 @@ from PhyAgentOS.runtime.watchdog.supervisor import WatchdogSupervisor
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run PhyAgentOS runtime v2 watchdog")
-    parser.add_argument("--workspace", required=True, help="Workspace containing TARGETS/SKILLS/SESSIONS.md")
+    parser.add_argument("--workspace", required=True, help="Workspace containing TARGETS/SKILLRUNTIME/SESSIONS.md")
     parser.add_argument(
         "--environment-workspace",
         help="Agent/shared workspace where perception writes ENVIRONMENT.md. Defaults to --workspace.",

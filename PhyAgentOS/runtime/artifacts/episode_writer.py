@@ -34,16 +34,18 @@ class EpisodeWriter:
         self,
         session: SessionSpec,
         target: TargetSpec,
-        skill_id: str,
+        skillruntime_id: str,
         result: SessionResult,
     ) -> Path:
         artifact_dir = self.artifacts_root / session.session_id
         artifact_dir.mkdir(parents=True, exist_ok=True)
         episode_path = artifact_dir / "episode.json"
+        benchmark_episode = _benchmark_episode_summary(result.metadata)
         payload = {
             "session_id": session.session_id,
             "target_id": target.id,
-            "skill_id": skill_id,
+            "skillruntime_id": skillruntime_id,
+            "benchmark": benchmark_episode,
             "success": result.success,
             "status": result.status,
             "num_steps": result.num_steps,
@@ -57,3 +59,14 @@ class EpisodeWriter:
         }
         atomic_write_text(episode_path, json.dumps(_jsonable(payload), indent=2, sort_keys=True) + "\n")
         return artifact_dir
+
+
+def _benchmark_episode_summary(metadata: dict[str, Any]) -> dict[str, Any] | None:
+    final_status = metadata.get("final_status")
+    if not isinstance(final_status, dict):
+        return None
+    for key in ("benchmark_episode", "episode_summary", "benchmark"):
+        summary = final_status.get(key)
+        if isinstance(summary, dict):
+            return summary
+    return None

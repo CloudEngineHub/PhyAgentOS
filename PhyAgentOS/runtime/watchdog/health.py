@@ -76,7 +76,7 @@ class HealthMonitor:
         return HealthCheck("execution", "passed")
 
     def _check_policy_endpoint(self, scheduled: ScheduledSession) -> HealthCheck:
-        if scheduled.skill_spec.runtime_kind != "policy":
+        if scheduled.skillruntime_spec.runtime_kind != "policy":
             return HealthCheck("policy_endpoint", "passed")
         if not scheduled.session.routing.policy_endpoint:
             return HealthCheck("policy_endpoint", "failed", "policy_endpoint is required for policy skills")

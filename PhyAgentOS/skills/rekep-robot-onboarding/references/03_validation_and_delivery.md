@@ -44,4 +44,4 @@ Report:
 - Where the SDK should live
 - Which files changed
 - What was verified
-- Exact deployment, startup, and `ACTION.md` usage commands
+- Exact deployment, startup, and runtime session commands

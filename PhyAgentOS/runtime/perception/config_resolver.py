@@ -21,7 +21,7 @@ from PhyAgentOS.runtime.watchdog.scheduler import ScheduledSession
 
 class ResolvedPerceptionPlan(BaseModel):
     target_id: str
-    skill_id: str
+    skillruntime_id: str
     session_id: str
     sensor_config_ref: str
     perception_config_ref: str | None = None
@@ -44,8 +44,8 @@ class PerceptionConfigResolver:
         self.workspace = workspace
 
     def resolve(self, scheduled: ScheduledSession) -> ResolvedPerceptionPlan | None:
-        required_sensors = list(scheduled.skill_spec.requires.sensors)
-        requested_outputs = list(scheduled.skill_spec.requires.environment_outputs)
+        required_sensors = list(scheduled.skillruntime_spec.requires.sensors)
+        requested_outputs = list(scheduled.skillruntime_spec.requires.environment_outputs)
         if not required_sensors and not requested_outputs:
             return None
 
@@ -53,7 +53,7 @@ class PerceptionConfigResolver:
         perception_refs = target.perception
         if not perception_refs.enabled:
             raise SchemaValidationError(
-                f"target {target.id} perception.enabled must be true for skill {scheduled.skill_id}"
+                f"target {target.id} perception.enabled must be true for skill {scheduled.skillruntime_id}"
             )
         if perception_refs.strict_preflight is not True:
             raise SchemaValidationError(
@@ -119,7 +119,7 @@ class PerceptionConfigResolver:
         artifact_dir = perception_refs.artifact_dir or Path("artifacts") / "perception" / target.id
         return ResolvedPerceptionPlan(
             target_id=target.id,
-            skill_id=scheduled.skill_id,
+            skillruntime_id=scheduled.skillruntime_id,
             session_id=scheduled.session.session_id,
             sensor_config_ref=str(perception_refs.sensor_config_ref),
             perception_config_ref=str(perception_refs.perception_config_ref)

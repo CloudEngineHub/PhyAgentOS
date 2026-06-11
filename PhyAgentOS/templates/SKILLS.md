@@ -1,107 +1,59 @@
-# Runtime Skills
+# Agent Skills
+
+Skills are Markdown instructions that extend the agent's behavior.
+They are separate from runtime skill runtimes in `SKILLRUNTIME.md`.
+
+## Locations
+
+- Workspace skills: `skills/<skill-name>/SKILL.md`
+- Built-in skills: packaged under `PhyAgentOS/skills/<skill-name>/SKILL.md`
+- Workspace skills override built-in skills with the same name.
+
+## Frontmatter
+
+Each skill may start with YAML frontmatter:
 
 ```yaml
-version: runtime_skill_registry_v1
-skills:
-  - id: openpi_sim_vla
-    runtime: OpenPISkillRuntime
-    runtime_kind: policy
-    loop_mode: policy_closed_loop
-    agent_exposure: none
-    supported_target_kinds:
-      - simulation
-    policy:
-      policy_client: dummy
-      policy_adapter: policy_adapter://dummy_openpi_adapter
-      supports_chunk: true
-    observation_contract:
-      observation_type: multimodal
-      empty_observation_allowed: false
-    supports_chunk: true
-    default_replan_every: 4
-    requires:
-      sensors:
-        - front_rgb
-        - wrist_rgb
-        - proprio
-      environment_outputs: []
-      strict_environment_contract: true
-    input_contract:
-      images:
-        - observation/image
-        - observation/wrist_image
-      state: observation/state
-      prompt: prompt
-    output_contract:
-      action:
-        action_space_id: dummy_policy_delta_eef_gripper_v1
-        tensor_key: actions
-        shape:
-          - T
-          - 7
-        dtype: float32
-        normalized: false
-        representation: delta_eef_pose_gripper
-        frame: base
-        chunk:
-          variable_T: true
-          default_T: 4
-          policy_hz: 20
-    adapter_requirements:
-      allowed_bridges:
-        - bridge://safety_clamp
-      forbidden:
-        - implicit_shape_truncation
-        - implicit_representation_cast
-  - id: pi05_libero_remote
-    runtime: OpenPISkillRuntime
-    runtime_kind: policy
-    loop_mode: policy_closed_loop
-    agent_exposure: none
-    supported_target_kinds:
-      - simulation
-      - real_robot
-    policy:
-      policy_client: openpi
-      policy_adapter: policy_adapter://libero_pi05_adapter
-      supports_chunk: true
-    observation_contract:
-      observation_type: multimodal
-      empty_observation_allowed: false
-    supports_chunk: true
-    default_replan_every: 5
-    requires:
-      sensors:
-        - front_rgb
-        - wrist_rgb
-        - proprio
-      environment_outputs: []
-      strict_environment_contract: true
-    input_contract:
-      images:
-        - observation/image
-        - observation/wrist_image
-      state: observation/state
-      prompt: prompt
-    output_contract:
-      action:
-        action_space_id: libero_pi05_delta_eef_gripper_v1
-        tensor_key: actions
-        shape:
-          - T
-          - 7
-        dtype: float32
-        normalized: false
-        representation: delta_eef_pose_gripper
-        frame: base
-        chunk:
-          variable_T: true
-          default_T: 50
-          policy_hz: 20
-    adapter_requirements:
-      allowed_bridges:
-        - bridge://safety_clamp
-      forbidden:
-        - implicit_shape_truncation
-        - implicit_representation_cast
+---
+name: example-skill
+description: Short user-facing summary.
+metadata: {"PhyAgentOS":{"always":false,"available":true}}
+---
 ```
+
+The metadata key may be `PhyAgentOS` or `openclaw`; both are accepted.
+
+## Loading Rules
+
+- Skills with `always: true` are loaded directly into context when requirements are met.
+- Other available skills appear in the skills summary and can be read on demand.
+- Skills with unmet requirements are listed as unavailable.
+- Dependency requirements can declare CLI binaries or environment variables under `requires`.
+- Agent skills may declare runtime availability requirements under `requires.runtime`;
+  this only controls agent skill visibility and does not create or register a
+  runtime skillruntime.
+
+Example runtime-aware metadata:
+
+```yaml
+---
+name: benchmarking
+description: Run runtime benchmark evaluations on enabled simulation targets.
+metadata: {"PhyAgentOS":{"always":false,"available":true,"requires":{"runtime":{"enabled":true,"target_kind":"simulation","skillruntime_kind":"policy"}}}}
+---
+```
+
+## Built-in Skills
+
+- `benchmarking`: available when runtime mode is enabled and `TARGETS.md` has
+  an enabled `simulation` target whose `supported_skillruntimes` contains a
+  `SKILLRUNTIME.md` entry with `runtime_kind: policy`. It inspects simulation
+  task lists, appends benchmark sessions to `SESSIONS.md`, waits for watchdog
+  writeback, aggregates `LOG.md` and `artifacts/runtime/*/episode.json`, and
+  writes an experiment report.
+
+## Authoring Rules
+
+- Keep a skill focused on one capability or workflow.
+- Put reusable scripts and references inside the skill directory.
+- Do not duplicate runtime registry entries here; use `SKILLRUNTIME.md` for runtime execution contracts.

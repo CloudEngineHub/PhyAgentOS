@@ -6,9 +6,9 @@ from collections.abc import Callable
 from typing import Any
 
 from PhyAgentOS.runtime.adapters.bridges import SafetyClampBridge
-from PhyAgentOS.runtime.adapters.minecraft.minecraft_adapter import MinecraftTargetAdapter
+from PhyAgentOS.runtime.adapters.openpi.pi05_policy_adapter import OpenPIPi05Adapter
+from PhyAgentOS.runtime.adapters.libero.target_adapter import LiberoTargetAdapter
 from PhyAgentOS.runtime.adapters.openpi.dummy_openpi_adapter import DummyOpenPIAdapter
-from PhyAgentOS.runtime.adapters.openpi.libero_pi05_adapter import LiberoPI05Adapter
 from PhyAgentOS.runtime.adapters.target_dummy import DummySimTargetAdapter
 from PhyAgentOS.runtime.schemas.adapter_plan import AdapterPlan
 from PhyAgentOS.runtime.watchdog.errors import AdapterError
@@ -73,7 +73,8 @@ def _require_uri(value: str, prefix: str) -> str:
 
 
 register_target_adapter("target_adapter://dummy_sim_adapter", DummySimTargetAdapter)
-register_target_adapter("target_adapter://minecraft_adapter", MinecraftTargetAdapter)
+register_target_adapter("target_adapter://libero_adapter", LiberoTargetAdapter)
+register_target_adapter("target_adapter://libero_mock_adapter", LiberoTargetAdapter)
 register_policy_adapter("policy_adapter://dummy_openpi_adapter", DummyOpenPIAdapter)
-register_policy_adapter("policy_adapter://libero_pi05_adapter", LiberoPI05Adapter)
+register_policy_adapter("policy_adapter://openpi_pi05_adapter", OpenPIPi05Adapter)
 register_action_bridge("bridge://safety_clamp", SafetyClampBridge)

@@ -32,8 +32,9 @@
 
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
-| ![v0.2.1](https://img.shields.io/badge/v0.2.1-FF574F) | 2026-05-29 | 基于 ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) 的MineCraft 就绪，以云端agent接入用户的本地服务器 |
-| ![v0.1.3](https://img.shields.io/badge/v0.1.3-47A882) | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离，Game Agent & Benchmarking 就绪 |
+| ![v0.1.5](https://img.shields.io/badge/v0.1.5-47A882) | 2026-06-11 | 清理协议文件及文档，game 场景分离至 `general-game-agent` 分支独立推进；当前分支聚焦仿真 & 真机重构 |
+| ![v0.1.4](https://img.shields.io/badge/v0.1.4-11648A) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
+| ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离，Game Agent & Benchmarking 就绪 |
 | ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | 感知插件体系：`SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` 可审计写回 |
 | ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP：`DummySimTarget` + `DummyAdapter` + `DummyClient` 串行链路 |
 | ![v0.1.0](https://img.shields.io/badge/v0.1.0-11648A) | 2026-04-29 | Hackathon 基线：插件化 HAL，ReKep / SAM3 真机抓取与 VLN 全链路 |
@@ -48,7 +49,7 @@
 <tr><td width="32">🔌</td><td><b>同代码，万硬件</b> — 新增机器人只需实现一个 Target Adapter（~100 行），调度层零改动。</td></tr>
 <tr><td>🛡️</td><td><b>三道安全防线</b> — Critic 校验 → Strict Preflight → Target-side SafetyGuard，真机场景不可绕过。</td></tr>
 <tr><td>📋</td><td><b>全程可审计</b> — 状态、动作、感知结果以 Markdown + YAML 落盘，每一步可追溯复现。</td></tr>
-<tr><td>🔄</td><td><b>零摩擦迁移</b> — 同一套 Session 协议在 sim / real / game 三类 target 上无差别运行。</td></tr>
+<tr><td>🔄</td><td><b>零摩擦迁移</b> — 同一套 Session 协议在 sim / real 2类 target 上无差别运行。</td></tr>
 </table>
 
 <br>
@@ -71,12 +72,12 @@
 <tr>
   <td>🎯</td>
   <td><b>Target-Configured</b></td>
-  <td><code>game</code> / <code>debug</code> / <code>simulation</code> / <code>real_robot</code> 四类 target，<code>TARGETS.md</code> 统一注册，adapter 按需挂载</td>
+  <td> <code>debug</code> / <code>simulation</code> / <code>real_robot</code> 三类 target，<code>TARGETS.md</code> 统一注册，adapter 按需挂载</td>
 </tr>
 <tr>
   <td>🧩</td>
   <td><b>Adapter + Bridge</b></td>
-  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> 三段解耦，<code>AdapterPlan</code> 自动编排，消灭 target×skill 组合爆炸</td>
+  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> 三段解耦，并显式声明 observation/action 契约；<code>AdapterPlan</code> 自动编排，消灭 target×skill 组合爆炸</td>
 </tr>
 <tr>
   <td>⚡</td>
@@ -86,12 +87,12 @@
 <tr>
   <td>🛡️</td>
   <td><b>Strict Preflight</b></td>
-  <td>10 项前置校验（target / sensor / perception / contract / tool），不合格直接 <code>rejected</code></td>
+  <td>运行时前置校验（target / sensor / perception / adapter contract / action contract / tool），不合格直接 <code>rejected</code></td>
 </tr>
 <tr>
   <td>📝</td>
   <td><b>文件协议矩阵</b></td>
-  <td><code>TARGETS.md</code> · <code>SKILLS.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + 外部 YAML</td>
+  <td><code>TARGETS.md</code> · <code>SKILLRUNTIME.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + 外部 YAML</td>
 </tr>
 <tr>
   <td>🔐</td>
@@ -138,10 +139,10 @@ paos onboard
 <td align="center">3</td>
 <td>
 
-**终端 1：启动 Runtime（Track B）**
+**启动 Agent**
 
 ```bash
-python -m PhyAgentOS.runtime.watchdog
+paos agent
 ```
 </td>
 </tr>
@@ -149,22 +150,53 @@ python -m PhyAgentOS.runtime.watchdog
 <td align="center">4</td>
 <td>
 
-**终端 2：启动 Agent（Track A）**
+**可选：连接 Runtime 服务**
 
 ```bash
-paos agent
+# LIBERO benchmark TargetWS 机器
+MUJOCO_GL=egl PYTHONWARNINGS=ignore \
+conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
+  --host 0.0.0.0 --port 9002
+
+# pi0.5 policy 机器
+conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_server \
+  --model-dir /path/to/pi05/checkpoint --host 0.0.0.0 --port 8000
 ```
 </td>
 </tr>
 </table>
 
-在 Agent CLI 中输入自然语言指令即可驱动硬件。无需硬件？运行 Smoke Test 验证全链路：
+当 config 启用 runtime 时，`paos agent` 和 `paos gateway` 会自动创建
+runtime workspace，并启动 session watchdog。Runtime target 由
+`TARGETS.md` 声明，可执行运行时由 `SKILLRUNTIME.md` 声明；Agent 通过向
+`SESSIONS.md` 追加 session 来排队执行任务。
 
 ```bash
-python scripts/init_runtime_workspace.py --workspace /tmp/paos_runtime_smoke
-python scripts/run_runtime_watchdog.py --workspace /tmp/paos_runtime_smoke --once
-# → session 标记 succeeded，结果写入 artifacts/
+paos agent -m "运行已配置的 LIBERO benchmark 任务"
 ```
+
+---
+
+## 🗂️ 协议文件
+
+| 进入上下文逻辑 | 文件 | 所属工作区 | 功能 |
+|:--|:--|:--|:--|
+| 始终进入 agent system prompt | `AGENTS.md` | Agent workspace | Agent 的项目级运行规则 |
+| 始终进入 agent system prompt | `SOUL.md` | Agent workspace | 身份、行为边界与助手风格 |
+| 始终进入 agent system prompt | `USER.md` | Agent workspace | 用户偏好与长期画像 |
+| 始终进入 agent system prompt | `TOOLS.md` | Agent workspace | 工具使用规则与可用工具说明 |
+| 始终进入 agent system prompt | `SKILLS.md` | Agent workspace | 面向 Agent 的 skill 发现与加载规则 |
+| 存在时进入上下文；涉及 target 时按启用 target 过滤 | `EMBODIED.md` | Agent workspace | Target 能力的人类可读描述 |
+| 存在时作为状态进入上下文，不是 bootstrap 规则 | `ENVIRONMENT.md` | Agent/runtime workspace | 当前 target、场景与环境状态 |
+| 存在时作为记忆/状态进入上下文 | `LESSONS.md` | Agent workspace | 运行经验、失败记录与修正建议 |
+| 存在时作为任务状态进入上下文 | `TASK.md` | Agent workspace | 多步任务拆解与进度 |
+| Runtime 协议；创建 session 前读取 | `RUNTIME.md` | Runtime workspace | 写入合法 runtime session 的说明 |
+| Runtime 协议；创建 session 前读取 | `TARGETS.md` | Runtime workspace | 已启用 target、endpoint/adapter/config 引用、支持的 skill runtime |
+| Runtime 协议；创建 session 前读取 | `SKILLRUNTIME.md` | Runtime workspace | Policy/builtin skill runtime 注册表与执行契约 |
+| Runtime 队列/状态；Agent 与 watchdog 写入 | `SESSIONS.md` | Runtime workspace | 待执行、执行中、已完成 session 与结果 |
+
+`SKILLS.md` 服务 Agent 能力与 skill 发现；`SKILLRUNTIME.md` 服务 runtime
+执行契约，并与 `TARGETS.md`、`SESSIONS.md` 配套使用。
 
 ---
 
@@ -178,16 +210,20 @@ PhyAgentOS/
 ├── PhyAgentOS/runtime/        # Track B  ─  执行平面
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
-│   ├── targets/               #   RolloutTarget (game·debug·sim·real)
-│   ├── skills/                #   PolicySkillRuntime / BuiltinSkillRuntime
+│   ├── targets/               #   RolloutTarget (debug·sim·real)
+│   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
+│   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
+│   │   ├── libero/            #   LIBERO target adapter
+│   │   └── openpi/            #   OpenPI policy adapters
+│   ├── policy/openpi/         #   OpenPI client + LeRobot pi0-family server
 │   ├── perception/            #   感知运行时 / EnvironmentWriter
 │   ├── preflight/             #   RuntimeCompatibilityPreflight
 │   └── schemas/               #   Pydantic Schema
 │
 ├── configs/runtime/           # Sensor / Perception / Contract YAML
 ├── scripts/                   # 工具脚本
-├── workspace/                 # 运行时工作区
+├── workspace/                 # Agent 工作区；runtime 文件可按配置共用该目录
 ├── docs/                      # 文档
 └── tests/                     # 测试
 ```
@@ -198,7 +234,6 @@ PhyAgentOS/
 
 | | Kind | 位置 | 示例 |
 |:--|:-----|:-----|:-----|
-| 🎮 | `game` | Local | Minecraft、星露谷物语 —— 低成本验证长期决策与记忆 |
 | 🐛 | `debug` | Local | echo / mock / dry-run —— 零硬件验证协议链路 |
 | 🧪 | `simulation` | Remote | RoboCasa、LIBERO —— Benchmark 评测与批量经验挖掘 |
 | 🤖 | `real_robot` | Remote | Franka、Go2、XLeRobot、AgileX PIPER —— 真实运行 |

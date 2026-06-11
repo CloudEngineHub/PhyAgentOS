@@ -28,7 +28,7 @@ class RuntimeCompatibilityPreflightResult(BaseModel):
     verdict: Literal["accepted", "rejected"]
     session_id: str
     target_id: str
-    skill_id: str
+    skillruntime_id: str
     runner_type: str = "SessionRunner"
     skill_runtime_kind: Literal["policy", "builtin"] | None = None
     execution_mode: str | None = None

@@ -1,1 +1,0 @@
-"""Minecraft target adapter."""

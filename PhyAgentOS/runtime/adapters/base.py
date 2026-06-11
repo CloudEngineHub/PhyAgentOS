@@ -7,6 +7,14 @@ from typing import Any
 
 
 class BaseTargetAdapter(ABC):
+    def output_observation_contract(self) -> dict[str, Any]:
+        """Declare canonical runtime observation produced by this adapter."""
+        return {}
+
+    def input_action_contract(self) -> dict[str, Any]:
+        """Declare executable action chunk accepted by this adapter."""
+        return {}
+
     @abstractmethod
     def to_runtime_observation(self, raw_obs: dict[str, Any], target_info: dict[str, Any]) -> dict[str, Any]:
         """Convert target raw observation to canonical RuntimeObservation."""
@@ -21,6 +29,14 @@ class BaseTargetAdapter(ABC):
 
 
 class BasePolicyAdapter(ABC):
+    def input_observation_contract(self) -> dict[str, Any]:
+        """Declare canonical runtime observation required by this policy adapter."""
+        return {}
+
+    def output_action_contract(self) -> dict[str, Any]:
+        """Declare policy action chunk produced by this adapter."""
+        return {}
+
     @abstractmethod
     def to_policy_input(
         self,

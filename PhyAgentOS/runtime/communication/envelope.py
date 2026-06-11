@@ -49,7 +49,7 @@ class RuntimeEnvelope(BaseModel):
     type: str
     session_id: str | None = None
     target_id: str | None = None
-    skill_id: str | None = None
+    skillruntime_id: str | None = None
     episode_id: str | None = None
     seq: int = Field(ge=0)
     timestamp_ns: int = Field(ge=0)

@@ -1,97 +1,61 @@
-# EMBODIED.md Template
+# Embodied Targets
 
-This file describes one embodied robot instance.
-The Critic Agent reads the runtime `EMBODIED.md` to validate whether proposed actions are safe and feasible.
+This file is the human-readable counterpart of `TARGETS.md`.
+Each section uses `## Target: <target_id>` so the agent can load only enabled targets from `TARGETS.md`, after applying `runtime.targetEnabled` config overrides.
 
-Use this template to understand the structure and meaning of each section.
-Do not keep concrete robot-specific values here in production; put those in `hal/profiles/*.md` and let the watchdog copy the matching profile into the robot workspace.
+## Target: libero_real_remote
 
-## Identity
+### Identity
 
-Describe what this robot is.
-Typical fields:
-- **Name**: human-readable robot name
-- **Type**: robot category, e.g. quadruped, arm, desktop pet, mobile manipulator
-- **Driver/Profile**: optional implementation identifier
+- **Name**: libero_real_remote
+- **Type**: remote simulation target
+- **Target Class**: remote
+- **Target Kind**: simulation
+- **Runtime**: LiberoRemoteTargetProxy
+- **Workspace**: workspaces/libero_real
 
-## Degrees of Freedom or Sensors
+### Supported Skills
 
-Use one or both of these sections depending on the robot type.
+| Skill | Runtime Kind | Description |
+|---|---|---|
+| `pi05_libero_remote` | policy | Closed-loop PI0.5 / OpenPI policy execution through the runtime session protocol. |
 
-### Degrees of Freedom
+### Observation Contract
 
-List movable joints, ranges, and what they control.
+- **Observation Type**: multimodal
+- **Empty Observation Allowed**: false
+- **Image Channels**: `observation/image`, `observation/wrist_image`
+- **State Channel**: `observation/state`
+- **Prompt Channel**: `prompt`
+- **Camera Resolution**: 256 x 256
 
-| Joint | Range | Description |
-|-------|-------|-------------|
-| example_joint | example range | what this joint does |
+### Action Contract
 
-### Sensors
+- **Action Representation**: delta_eef_pose_gripper
+- **Action Dimension**: 7
+- **Frame**: base
+- **Chunk Mode**: variable-length chunks, default up to 50 actions
+- **Policy Hz**: 20
+- **Max Steps**: 280
+- **Warmup Wait Steps**: 10
 
-List the robot's sensing capabilities when perception matters.
+### Runtime Connection
 
-- **Camera**: optional
-- **LiDAR**: optional
-- **Odometry**: optional
-- **Microphone**: optional
+- **Target Endpoint**: `targetws://libero-host:9002`
+- **Target Adapter**: `target_adapter://libero_adapter`
+- **Runtime Contract**: `configs/runtime/contracts/libero_real.runtime.yaml`
+- **Policy Skill**: `pi05_libero_remote`
 
-## Supported Actions
+### Perception
 
-This is the most important section for the Critic.
-List the actions the robot can safely accept, their parameters, and what they do.
+- **Enabled**: false
+- **Strict Preflight**: true
+- **Sensor Config**: none
+- **Perception Config**: none
+- **Artifact Directory**: none
 
-| Action | Parameters | Description |
-|--------|-----------|-------------|
-| `example_action` | `arg1, arg2` | Example action description |
+### Safety and Constraints
 
-## Physical Constraints
-
-Describe hard limits and safety boundaries.
-Examples:
-- **Workspace bounds**
-- **Max payload**
-- **Max reach**
-- **Collision policy**
-- **Speed limits**
-
-## Connection
-
-Describe how the robot is reached by HAL.
-This section is static capability/configuration, not runtime status.
-Examples:
-- **Transport**
-- **Host**
-- **Port**
-- **User**
-- **Auth**
-- **Reconnect Policy**
-- **Health Check**
-
-Runtime connection state belongs in `ENVIRONMENT.md` under `robots.<robot_id>.connection_state`.
-
-## Runtime Protocol
-
-Optionally document how this robot maps into shared runtime state.
-Examples:
-- **Connection channel**: `robots.<robot_id>.connection_state`
-- **Pose channel**: `robots.<robot_id>.robot_pose`
-- **Navigation channel**: `robots.<robot_id>.nav_state`
-- **Health owner**: usually `hal_watchdog.py`
-
-## Navigation & Multi-Agent Protocol
-
-Use this section when the robot participates in navigation or fleet coordination.
-Typical items:
-- **Environment schema**: usually `PhyAgentOS.environment.v1`
-- **Per-robot state isolation**
-- **Scene graph assumptions**
-- **Safety distance**
-- **Relocalization support**
-- **ROS2 bridge support**
-
-## Authoring Rules
-
-- Keep this file specific to one robot profile.
-- Put concrete robot values in `hal/profiles/*.md`, not in the template.
-- Keep runtime status out of this file; runtime status belongs in `ENVIRONMENT.md`.
-- In fleet mode, each robot workspace should have its own runtime `EMBODIED.md` copied from the matching profile.
+- Runtime sessions must be appended to `SESSIONS.md`; direct action queues are not supported.
+- Preflight must verify target enablement, adapter compatibility, observation schema, policy adapter, and action contract before execution.
+- Do not invent endpoints or adapter URIs. Use values from `TARGETS.md` unless the user explicitly overrides them.
