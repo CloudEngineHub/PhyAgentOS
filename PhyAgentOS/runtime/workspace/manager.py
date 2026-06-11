@@ -114,6 +114,7 @@ class RuntimeWorkspaceManager:
     def __init__(self, config: Config):
         self.config = config
         self.workspace = config.runtime_workspace_path
+        self.environment_workspace = config.workspace_path
         self._watchdog: BackgroundWatchdog | None = None
 
     def provision(self) -> RuntimeWorkspaceReport:
@@ -137,7 +138,7 @@ class RuntimeWorkspaceManager:
         if self._watchdog is None:
             self._watchdog = BackgroundWatchdog(
                 self.workspace,
-                environment_workspace=self.config.workspace_path,
+                environment_workspace=self.environment_workspace,
                 poll_interval_s=self.config.runtime.watchdog_poll_interval_s,
             )
             self._watchdog.start()
@@ -182,12 +183,19 @@ class RuntimeWorkspaceManager:
         report.created.append("SESSIONS.md")
 
     def _ensure_empty_environment(self, report: RuntimeWorkspaceReport) -> None:
-        environment_path = self.workspace / "ENVIRONMENT.md"
-        if environment_path.exists():
+        created = False
+        skipped = False
+        for environment_path in self._environment_paths():
+            environment_path.parent.mkdir(parents=True, exist_ok=True)
+            if environment_path.exists():
+                skipped = True
+                continue
+            environment_path.write_text("", encoding="utf-8")
+            created = True
+        if created:
+            report.created.append("ENVIRONMENT.md")
+        elif skipped:
             report.skipped.append("ENVIRONMENT.md")
-            return
-        environment_path.write_text("", encoding="utf-8")
-        report.created.append("ENVIRONMENT.md")
 
     def write_runtime_instructions(self, report: RuntimeWorkspaceReport | None = None) -> RuntimeWorkspaceReport:
         report = report or RuntimeWorkspaceReport(workspace=self.workspace)
@@ -232,6 +240,15 @@ class RuntimeWorkspaceManager:
         report: RuntimeWorkspaceReport | None = None,
     ) -> RuntimeWorkspaceReport:
         report = report or RuntimeWorkspaceReport(workspace=self.workspace)
+        existing_source = self._latest_existing_environment()
+        if existing_source is not None:
+            created, updated = self._mirror_environment_from(existing_source)
+            if created and "ENVIRONMENT.md" not in report.created:
+                report.created.append("ENVIRONMENT.md")
+            elif updated and "ENVIRONMENT.md" not in report.created and "ENVIRONMENT.md" not in report.updated:
+                report.updated.append("ENVIRONMENT.md")
+            return report
+
         targets_path = self.workspace / "TARGETS.md"
         if not targets_path.exists():
             return report
@@ -253,17 +270,54 @@ class RuntimeWorkspaceManager:
                 if isinstance(target, dict) and isinstance(target.get("id"), str)
             },
         }
-        env_path = self.workspace / "ENVIRONMENT.md"
-        existed = env_path.exists()
         text = (
             "# Environment State\n\n"
             "Auto-updated by PhyAgentOS runtime workspace manager.\n\n"
             f"```json\n{json.dumps(payload, indent=2, ensure_ascii=False)}\n```\n"
         )
-        atomic_write_text(env_path, text)
+        existed = all(path.exists() for path in self._environment_paths())
+        for env_path in self._environment_paths():
+            env_path.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(env_path, text)
         if "ENVIRONMENT.md" not in report.created and "ENVIRONMENT.md" not in report.updated:
             (report.updated if existed else report.created).append("ENVIRONMENT.md")
         return report
+
+    def _environment_paths(self) -> tuple[Path, ...]:
+        """Runtime-local and agent-visible environment files."""
+        runtime_path = self.workspace / "ENVIRONMENT.md"
+        agent_path = self.environment_workspace / "ENVIRONMENT.md"
+        if runtime_path == agent_path:
+            return (runtime_path,)
+        return (runtime_path, agent_path)
+
+    def _latest_existing_environment(self) -> Path | None:
+        candidates = [
+            path
+            for path in self._environment_paths()
+            if path.exists() and path.stat().st_size > 0
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda path: path.stat().st_mtime_ns)
+
+    def _mirror_environment_from(self, source: Path) -> tuple[bool, bool]:
+        """Mirror the newest non-empty environment without overwriting it."""
+        content = source.read_text(encoding="utf-8")
+        created = False
+        updated = False
+        for dest in self._environment_paths():
+            if dest == source:
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if not dest.exists():
+                atomic_write_text(dest, content)
+                created = True
+                continue
+            if dest.read_text(encoding="utf-8") != content:
+                atomic_write_text(dest, content)
+                updated = True
+        return created, updated
 
     def _target_snapshot(self, target: dict[str, Any], now: str) -> dict[str, Any]:
         runtime = target.get("runtime") if isinstance(target.get("runtime"), dict) else {}
@@ -324,7 +378,19 @@ class BackgroundWatchdog:
         while not self._stop.is_set():
             try:
                 ran = supervisor.run_once()
+                if ran:
+                    self._mirror_environment_to_runtime_workspace()
             except Exception:
                 ran = False
             if not ran:
                 self._stop.wait(self.poll_interval_s)
+
+    def _mirror_environment_to_runtime_workspace(self) -> None:
+        src = self.environment_workspace / "ENVIRONMENT.md"
+        dest = self.workspace / "ENVIRONMENT.md"
+        if src == dest or not src.exists():
+            return
+        try:
+            atomic_write_text(dest, src.read_text(encoding="utf-8"))
+        except Exception:
+            return

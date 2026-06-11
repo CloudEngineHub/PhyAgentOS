@@ -399,6 +399,7 @@ def gateway(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         embodiment_registry=registry,
+        runtime_workspace=config.runtime_workspace_path,
         runtime_enabled=config.runtime.enabled,
         runtime_target_enabled=config.runtime.target_enabled,
     )
@@ -592,6 +593,7 @@ def agent(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         embodiment_registry=registry,
+        runtime_workspace=config.runtime_workspace_path,
         runtime_enabled=config.runtime.enabled,
         runtime_target_enabled=config.runtime.target_enabled,
     )

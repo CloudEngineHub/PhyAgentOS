@@ -35,10 +35,12 @@ class ContextBuilder:
         self,
         workspace: Path,
         *,
+        runtime_workspace: Path | None = None,
         runtime_enabled: bool = True,
         runtime_target_enabled: dict[str, bool] | None = None,
     ):
         self.workspace = workspace
+        self.runtime_workspace = runtime_workspace or workspace
         self.runtime_enabled = runtime_enabled
         self.runtime_target_enabled = dict(runtime_target_enabled or {})
         self.memory = MemoryStore(workspace)
@@ -148,7 +150,7 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
 
         # Embodied extensions — present only when the workspace provides them.
         for filename in self.EMBODIED_FILES:
-            file_path = self.workspace / filename
+            file_path = self._context_file_path(filename)
             if file_path.exists():
                 if filename == "EMBODIED.md":
                     content = self._load_enabled_embodied_content(file_path)
@@ -159,6 +161,14 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
                 parts.append(f"## {filename}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
+
+    def _context_file_path(self, filename: str) -> Path:
+        """Return the context-visible source path for a protocol file."""
+        if self.runtime_enabled and filename in {"EMBODIED.md", "RUNTIME.md"}:
+            runtime_path = self.runtime_workspace / filename
+            if runtime_path.exists():
+                return runtime_path
+        return self.workspace / filename
 
     def _load_enabled_embodied_content(self, path: Path) -> str:
         """Load target capability prose only for targets enabled in TARGETS.md/config."""
@@ -173,7 +183,9 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
         return self._filter_embodied_targets(content, enabled_targets)
 
     def _enabled_runtime_target_ids(self) -> set[str] | None:
-        targets_path = self.workspace / "TARGETS.md"
+        targets_path = self.runtime_workspace / "TARGETS.md"
+        if not targets_path.exists():
+            targets_path = self.workspace / "TARGETS.md"
         if not targets_path.exists():
             return None
         try:

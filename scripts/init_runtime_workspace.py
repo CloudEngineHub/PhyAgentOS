@@ -48,6 +48,7 @@ def init_runtime_workspace(workspace: Path, force: bool = False) -> dict[str, li
         dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
         result["overwritten" if existed else "created"].append(name)
     cfg = Config()
+    cfg.agents.defaults.workspace = str(workspace)
     cfg.runtime.workspace = str(workspace)
     cfg.runtime.autostart_watchdog = False
     manager = RuntimeWorkspaceManager(cfg)

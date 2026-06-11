@@ -69,6 +69,7 @@ class AgentLoop:
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
         embodiment_registry: EmbodimentRegistry | None = None,
+        runtime_workspace: Path | None = None,
         runtime_enabled: bool = True,
         runtime_target_enabled: dict[str, bool] | None = None,
     ):
@@ -88,6 +89,7 @@ class AgentLoop:
 
         self.context = ContextBuilder(
             workspace,
+            runtime_workspace=runtime_workspace,
             runtime_enabled=runtime_enabled,
             runtime_target_enabled=runtime_target_enabled,
         )
