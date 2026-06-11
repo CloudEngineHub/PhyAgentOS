@@ -29,6 +29,28 @@ The metadata key may be `PhyAgentOS` or `openclaw`; both are accepted.
 - Other available skills appear in the skills summary and can be read on demand.
 - Skills with unmet requirements are listed as unavailable.
 - Dependency requirements can declare CLI binaries or environment variables under `requires`.
+- Agent skills may declare runtime availability requirements under `requires.runtime`;
+  this only controls agent skill visibility and does not create or register a
+  runtime skillruntime.
+
+Example runtime-aware metadata:
+
+```yaml
+---
+name: benchmarking
+description: Run runtime benchmark evaluations on enabled simulation targets.
+metadata: {"PhyAgentOS":{"always":false,"available":true,"requires":{"runtime":{"enabled":true,"target_kind":"simulation","skillruntime_kind":"policy"}}}}
+---
+```
+
+## Built-in Skills
+
+- `benchmarking`: available when runtime mode is enabled and `TARGETS.md` has
+  an enabled `simulation` target whose `supported_skillruntimes` contains a
+  `SKILLRUNTIME.md` entry with `runtime_kind: policy`. It inspects simulation
+  task lists, appends benchmark sessions to `SESSIONS.md`, waits for watchdog
+  writeback, aggregates `LOG.md` and `artifacts/runtime/*/episode.json`, and
+  writes an experiment report.
 
 ## Authoring Rules
 

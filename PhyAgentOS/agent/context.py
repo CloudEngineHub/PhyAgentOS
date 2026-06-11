@@ -42,7 +42,11 @@ class ContextBuilder:
         self.runtime_enabled = runtime_enabled
         self.runtime_target_enabled = dict(runtime_target_enabled or {})
         self.memory = MemoryStore(workspace)
-        self.skills = SkillsLoader(workspace)
+        self.skills = SkillsLoader(
+            workspace,
+            runtime_enabled=runtime_enabled,
+            runtime_target_enabled=self.runtime_target_enabled,
+        )
 
     def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
         """Build the system prompt from identity, bootstrap files, memory, and skills."""
