@@ -30,7 +30,7 @@
 - **一套代码，任意硬件**：新增机器人只需实现一个 Target Adapter（约 100 行），调度层零改动
 - **三道安全防线**：Critic 校验 → Strict Preflight → Target 端 SafetyGuard，真机场景不可绕过
 - **全程可审计**：状态、动作、感知结果以 Markdown + YAML 落盘，每一步可追溯复现
-- **零摩擦迁移**：同一套 Session 协议在仿真、真机、游戏三类 Target 上无差别运行
+- **零摩擦迁移**：同一套 Session 协议在仿真、真机两类 Target 上无差别运行
 
 ### 关键数据
 
@@ -93,14 +93,13 @@ Track A (Agent)          工作区文件           Track B (Runtime)
 - **旧模型（Driver-Centered）**：observe / execute / profile / safety 耦合在单个 Driver 类中
 - **新模型（Session-Centered）**：RolloutTarget（负责执行对象）+ SkillRuntime（负责执行策略）+ TargetAdapter（负责数据变换）三段解耦
 
-同一套 Session 协议可以在 game / debug / simulation / real_robot 四类 Target 上无差别运行。
+同一套 Session 协议可以在 debug / simulation / real_robot 三类 Target 上无差别运行。
 
-### 1.2.4 三场景互补
+### 1.2.4 双场景互补
 
-三个并行场景共用 Base Runtime 内核，各自独立演进：
+两个并行场景共用 Base Runtime 内核，各自独立演进：
 
-- **Game Agent（星露谷物语）**：低成本验证长期记忆与自主决策 → 策略复用至 Sim/Real
-- **Sim（MuJoCo + ManiSkill）**：Benchmark 评测 + 批量经验挖掘 → 经验迁移至 Real
+- **Sim（MuJoCo + ManiSkill）**：Benchmark 评测 + 批量经验挖掘
 - **Real（移动抓取 + 语音）**：真实交互数据 → 改善 Sim 仿真保真度
 
 ---
@@ -124,14 +123,14 @@ Track A (Agent)          工作区文件           Track B (Runtime)
                     │  Critic 校验框架              │
                     └──────┬──────┬──────┬────────┘
                            │      │      │
-              ┌────────────┼──────┼──────┼────────────┐
-              ▼            ▼      ▼      ▼            ▼
-   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-   │ 场景 1: Game │ │ 场景 2: Sim  │ │ 场景 3: Real │
-   │ 星露谷物语   │ │ MuJoCo+      │ │ 移动抓取+    │
-   │ 长期记忆     │ │ ManiSkill    │ │ 语音交互     │
-   │ 自主运作     │ │ 自进化       │ │ 活人感       │
-   └──────────────┘ └──────────────┘ └──────────────┘
+                           │      │      │
+                           ▼      ▼      ▼ 
+               ┌──────────────┐ ┌──────────────┐
+               │ 场景 1: Sim  │ │ 场景 2: Real │
+               │ MuJoCo+      │ │ 移动抓取+    │
+               │ ManiSkill    │ │ 语音交互     │
+               │ 自进化        │ │ 活人感       │
+               └──────────────┘ └──────────────┘
 ```
 
 ### 1.3.2 Runtime 执行链路
@@ -170,7 +169,7 @@ class BaseRolloutTarget(ABC):
     def get_state(self) -> dict: ...      # 运行态（供 ENVIRONMENT.md 回写）
 ```
 
-WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
+WatchdogSupervisor 不需要知道 Target 是仿真还是真机。
 
 ### 1.3.5 解耦边界
 
@@ -188,7 +187,7 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 | 特性 | 说明 |
 |------|------|
 | **Session-Centered Runtime** | `WatchdogSupervisor` → `SessionRunner` → `SkillRuntime` → `TargetSessionHandle` 执行链路 |
-| **Target-Configured** | `game` / `debug` / `simulation` / `real_robot` 四类 Target，`TARGETS.md` 统一注册 |
+| **Target-Configured** | `debug` / `simulation` / `real_robot` 三类 Target，`TARGETS.md` 统一注册 |
 | **Adapter + Bridge** | `TargetAdapter` + `PolicyAdapter` + `ActionBridge` 三段解耦，自动编排 |
 | **双轨 Skill Runtime** | `PolicySkillRuntime` 维护策略闭环 + `BuiltinSkillRuntime` 管理 Agent 交互闭环 |
 | **Strict Preflight** | 10 项前置校验（target / sensor / perception / contract / tool），不合格直接拒绝 |
@@ -209,8 +208,8 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 | v0.1.0 | 2026-04-29 | Hackathon 基线：插件化 HAL，ReKep / SAM3 真机抓取与 VLN 全链路 |
 | v0.1.1 | 2026-05-18 | Session-Centered Runtime MVP：`DummySimTarget` + `DummyAdapter` + `DummyClient` 串行链路 |
 | v0.1.2 | 2026-05-20 | 感知插件体系：`SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` 可审计写回 |
-| v0.1.3 | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离；Game Agent & Benchmarking 就绪 |
-| v0.2.1 | 2026-05-29 | Minecraft 就绪：云端 Agent 连接用户本地服务器 |
+| v0.1.3 | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离 |
+| v0.2.1 | 2026-05-29 | LIBERO benchmark 远程 target server 就绪 |
 
 ### 已达成能力
 
@@ -223,7 +222,6 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 - 感知管线（GeometryPipeline + SegmentationPipeline + FusionPipeline）
 - 语义导航（SemanticNavigationTool，语义目标 → 物理坐标）
 - 外部插件动态加载机制
-- Minecraft Game Target（mineflayer HTTP bridge 远程操控，无协议依赖）
 
 ---
 
@@ -242,7 +240,7 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 | `BaseDriver` | `RolloutTarget` + `SkillRuntime` + `TargetAdapter` | 拆分为三个一级对象 |
 | `hal_watchdog.py` | `WatchdogSupervisor` | 从动作轮询器升级为执行会话监督器 |
 | 单动作队列 | `SESSIONS.md` | Session schema 是当前执行队列 |
-| 机器人专用索引 | `TARGETS.md` | 统一 sim / game / real target registry |
+| 机器人专用索引 | `TARGETS.md` | 统一 sim / real target registry |
 | 导航/ReKep 作为驱动内功能 | `SkillRuntime`（BuiltinAlgorithmSkillRuntime） | 提升为一级 skill runtime |
 | 仿真驱动 | `SimTarget` | 提升为一级 rollout target |
 
@@ -252,10 +250,9 @@ WatchdogSupervisor 不需要知道 Target 是游戏、仿真还是真机。
 Phase 0: Base MVP（1-2 周）
   → Schema + State I/O + Watchdog + Dummy 闭环
 
-Phase 1: 三场景并行（各 1-2 周，互不阻塞）
-  ├── 场景 1: 星露谷 Game Agent（当前优先级最高）
-  ├── 场景 2: MuJoCo + ManiSkill 仿真
-  └── 场景 3: 真机移动抓取 + 语音
+Phase 1: 双场景并行（各 1-2 周，互不阻塞）
+  ├── 场景 1: MuJoCo + ManiSkill 仿真
+  └── 场景 2: 真机移动抓取 + 语音
 
 Phase 2: 深度演进
   → Policy Server / LIBERO / RoboCasa / Hybrid Skill
@@ -277,31 +274,24 @@ Phase 2: 深度演进
 
 ### 短期重点（1-2 月）
 
-1. **星露谷 Game Agent（场景 1）**
-   - StardewTarget 实现：连接 SMAPI mod (HTTP)
-   - 跨 season 长期记忆验证
-   - NPC 关系网络的社交记忆训练
-   - 14 天无人干预运行验收
-   - 已达成：Minecraft Game Target 作为首个 game 类型 Target，验证了 HTTP bridge 远程操控模式（详见 [用户手册 §2.6.7](../02-user-manual.md#267-minecraft-game-agent)）
-
-2. **Base Runtime 完型**
+1. **Base Runtime 完型**
    - Session 状态机健全：pending → claimed → running → succeeded / failed / timed_out
    - Goal Graph + Session Compiler
    - Fallback chain 机制
 
-3. **Perception 深化**
+2. **Perception 深化**
    - 相机/LiDAR 接入标准化
    - 分割模型依赖管理
    - 场景图构建与写回协议完善
 
 ### 中期方向（3-6 月）
 
-- **场景 2：MuJoCo + ManiSkill 仿真**
+- **场景 2：MuJoCo + ManiSkill 仿真**（原场景 1B）
   - ManiSkillTarget 实现
   - BenchmarkHarness 自动化评测
   - 自进化经验闭环（LESSONS.md 自动积累）
 
-- **场景 3：真机移动抓取 + 语音**
+- **场景 3：真机移动抓取 + 语音**（原场景 1C）
   - CompositeTarget 多机器人组合
   - SafetyGuard 本地安全裁决
   - Action Chunk 缓冲机制（chunk_size=8, 软融合）
@@ -335,18 +325,7 @@ Phase 2: 深度演进
 - [ ] FailureEscalator（retry / reset / cancel / notify / safety stop）
 - [ ] DummySimTarget + DummyAdapter + DummyClient 闭环验收
 
-### 场景 1：星露谷 Game Agent（Phase 1A，当前优先级）
-
-- [ ] SMAPI Mod 开发（HTTP API 暴露游戏状态）
-- [ ] StardewTarget 实现（build / reset / observe / step / close）
-- [ ] StardewAdapter 数据变换（游戏坐标 → 目标坐标）
-- [ ] NPC 关系网络记忆结构
-- [ ] 跨 season / 跨日记忆持久化
-- [ ] Planner 自主目标生成（挖矿/钓鱼/社交/种地并行目标）
-- [ ] 14 天无人干预运行验证
-- [ ] LESSONS.md 游戏失败经验积累
-
-### 场景 2：MuJoCo + ManiSkill 仿真（Phase 1B）
+### 场景 1：MuJoCo + ManiSkill 仿真（Phase 1A）
 
 - [ ] ManiSkillTarget 实现（build / observe / step, RGBD + proprioception）
 - [ ] BenchmarkHarness 评测框架（run_benchmark → BenchmarkResult）
@@ -354,7 +333,7 @@ Phase 2: 深度演进
 - [ ] 自动 LESSONS.md 经验积累
 - [ ] Benchmark score 追踪与可视化
 
-### 场景 3：真机移动抓取 + 语音（Phase 1C）
+### 场景 2：真机移动抓取 + 语音（Phase 1B）
 
 - [ ] CompositeTarget 接口定义（多机器人组合）
 - [ ] SafetyGuard 本地安全裁决器
@@ -387,7 +366,6 @@ Phase 2: 深度演进
 | Franka 问答+抓取 | Franka Research 3 | 实时对话 + NL 驱动抓取 |
 | Go2 语义导航 | Unitree Go2 | 语义目标导航（"去门口巡检"） |
 | Isaac Sim 复合操作 | PIPER + Go2 | 无代码 Isaac Sim 环境操控 |
-| Minecraft 云端 Agent | Minecraft | 云端 Agent 接入本地服务器 |
 
 ### 支持设备一览
 
@@ -461,7 +439,7 @@ PhyAgentOS/
 ├── PhyAgentOS/runtime/        # Track B ─ 执行平面
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
-│   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   ├── targets/               #   RolloutTarget (debug·sim·real)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge

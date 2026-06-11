@@ -176,22 +176,6 @@ class BaseRolloutTarget(ABC):
 #### 场景实现示例
 
 ```python
-# 场景 1: 星露谷 Game Target
-class StardewTarget(BaseRolloutTarget):
-    def build(self): ...       # 连接 SMAPI mod (HTTP)
-    def reset(self, ctx): ...  # 加载游戏日/season
-    def observe(self): ...     # 返回：位置/时间/背包/NPC关系/作物状态
-    def step(self, action): ...# 执行 move_to/interact/sleep
-    def close(self): ...       # 断开 SMAPI 连接
-
-# Game Target: Minecraft（已验证）
-class MinecraftTarget(BaseLocalTarget):
-    def build(self): ...       # HTTP GET /health → 验证 bridge 可达
-    def reset(self, ctx): ...  # 初始观察（位置/背包/附近方块/实体）
-    def observe(self): ...     # HTTP GET /state → 完整游戏快照
-    def step(self, action): ...# HTTP POST /action → mineflayer 执行
-    def close(self): ...       # 释放 HTTP 客户端
-
 # 场景 2: 仿真 Target
 class ManiSkillTarget(BaseRolloutTarget):
     def build(self): ...       # 初始化 ManiSkill 环境
@@ -445,11 +429,7 @@ class MyTarget(BaseRolloutTarget):
 
 **不需要懂**: Watchdog、Session 状态机、文件协议、Critic——Base 层已处理。
 
-> **参考实现**：`runtime/targets/game/minecraft_target.py`（182 行）是一个干净的 `BaseLocalTarget` 实现。它完全不依赖 Minecraft 协议库（无 pyCraft），仅通过 HTTP 与外部 mineflayer bridge 通信。适合作为 game 类型 Target 的参考模板。
->
-> 部署指南、使用细节与 9 条踩坑记录见 [Minecraft scenario 文档](../../scenarios/game/minecraft/zh/deployment.md)。
 
----
 
 ### 3.4.3 开发外部插件
 

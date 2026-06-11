@@ -63,30 +63,4 @@ targets:
       max_chunk_size: 50
       max_steps: 280
       num_steps_wait: 10
-  - id: minecraft_java_env
-    target_class: local
-    target_kind: game
-    workspace: workspaces/minecraft
-    enabled: true
-    supported_skillruntimes:
-      - minecraft_navigate
-      - minecraft_mine
-      - minecraft_build
-    runtime:
-      target_runtime: MinecraftTargetRuntime
-      target_endpoint: targetws://local/minecraft_java_env
-      target_adapter: target_adapter://minecraft_adapter
-      runtime_contract_ref: configs/runtime/contracts/minecraft.runtime.yaml
-    observation:
-      observation_type: structured
-      empty_observation_allowed: false
-    perception:
-      enabled: false
-      strict_preflight: true
-      sensor_config_ref: null
-      perception_config_ref: null
-      artifact_dir: null
-    config:
-      bridge_url: "https://carucated-kattie-cryptogamic.ngrok-free.dev"   # ← ngrok 公网地址
-      step_delay: 0.1
 ```

@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 from PhyAgentOS.runtime.communication.target_ws_client import TargetWSClient
 from PhyAgentOS.runtime.schemas import TargetSpec
 from PhyAgentOS.runtime.targets.base import BaseRolloutTarget
-from PhyAgentOS.runtime.targets.game.minecraft_target import MinecraftTarget
 from PhyAgentOS.runtime.targets.local.dummy_sim_target import DummySimTarget
 from PhyAgentOS.runtime.targets.remote.libero.proxy import LiberoRemoteTargetProxy
 from PhyAgentOS.runtime.targets.remote.proxy import RemoteTargetProxy
@@ -61,10 +60,6 @@ def build_dummy_sim_target(target: TargetSpec) -> DummySimTarget:
     return DummySimTarget(target.config)
 
 
-def build_minecraft_target(target: TargetSpec) -> MinecraftTarget:
-    return MinecraftTarget(target.config)
-
-
 def build_remote_target_proxy(target: TargetSpec, client: TargetWSClient) -> RemoteTargetProxy:
     return RemoteTargetProxy(client, config=target.config)
 
@@ -79,6 +74,5 @@ def _is_targetws_endpoint(endpoint: str) -> bool:
 
 
 register_local_target_runtime("DummySimTargetRuntime", build_dummy_sim_target)
-register_local_target_runtime("MinecraftTargetRuntime", build_minecraft_target)
 register_remote_target_runtime("RemoteTargetProxy", build_remote_target_proxy)
 register_remote_target_runtime("LiberoRemoteTargetProxy", build_libero_remote_target_proxy)

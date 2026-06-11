@@ -32,6 +32,7 @@
 
 | Version | Date | Update |
 |:------|:-----|:-------|
+| ![v0.1.5](https://img.shields.io/badge/v0.1.5-47A882) | 2026-06-11 | Cleaned protocol files and docs; game scenario separated to `general-game-agent` branch; main branch now focused on sim & real |
 | ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | Based on ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) — Clean Protocol Files and Docs |
 | ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | Based on ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) — Minecraft pipeline optimization: issue and execute commands from terminal and in-game chat |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | Based on ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) — Minecraft ready: cloud agent connects to user's local server |
@@ -51,7 +52,7 @@ Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to exec
 <tr><td width="32">🔌</td><td><b>One Codebase, Any Hardware</b> — Adding a new robot means implementing one Target Adapter (~100 lines); zero changes to the scheduling layer.</td></tr>
 <tr><td>🛡️</td><td><b>Three Safety Layers</b> — Critic validation → Strict Preflight → Target-side SafetyGuard; mandatory for real-robot deployment.</td></tr>
 <tr><td>📋</td><td><b>Fully Auditable</b> — State, actions, and perception results are written to Markdown + YAML files; every step is traceable and reproducible.</td></tr>
-<tr><td>🔄</td><td><b>Zero-Friction Migration</b> — The same Session protocol runs identically across sim, real, and game targets.</td></tr>
+<tr><td>🔄</td><td><b>Zero-Friction Migration</b> — The same Session protocol runs identically across sim and real targets.</td></tr>
 </table>
 
 <br>
@@ -74,7 +75,7 @@ Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to exec
 <tr>
   <td>🎯</td>
   <td><b>Target-Configured</b></td>
-  <td>Four target kinds — <code>game</code> / <code>debug</code> / <code>simulation</code> / <code>real_robot</code> — registered in <code>TARGETS.md</code>, adapters attached on demand</td>
+  <td>Three target kinds — <code>debug</code> / <code>simulation</code> / <code>real_robot</code> — registered in <code>TARGETS.md</code>, adapters attached on demand</td>
 </tr>
 <tr>
   <td>🧩</td>
@@ -212,7 +213,7 @@ PhyAgentOS/
 ├── PhyAgentOS/runtime/        # Track B  ─  Execution Plane
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
-│   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   ├── targets/               #   RolloutTarget (debug·sim·real)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
@@ -236,7 +237,6 @@ PhyAgentOS/
 
 | | Kind | Location | Examples |
 |:--|:-----|:-----|:-----|
-| 🎮 | `game` | Local | Minecraft, Stardew Valley — low-cost validation of long-term decisions & memory |
 | 🐛 | `debug` | Local | echo / mock / dry-run — zero-hardware protocol pipeline validation |
 | 🧪 | `simulation` | Remote | RoboCasa, LIBERO — benchmark evaluation & batch experience mining |
 | 🤖 | `real_robot` | Remote | Franka, Go2, XLeRobot, AgileX PIPER — real-world deployment |

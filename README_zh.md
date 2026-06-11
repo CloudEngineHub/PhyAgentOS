@@ -29,13 +29,13 @@
 ---
 
 ## 📢 更新日志
-README_zh.md
+
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
-| ![v0.2.3](https://img.shields.io/badge/v0.2.3-FF574F) | 2026-05-29 | 基于 ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) 清理了协议文件以及文档 |
-| ![v0.2.2](https://img.shields.io/badge/v0.2.2-FF574F) | 2026-05-29 | 基于 ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) 的MineCraft通路优化，可以在终端和游戏内下达指令并执行 |
+| ![v0.1.5](https://img.shields.io/badge/v0.1.5-47A882) | 2026-06-11 | 清理协议文件及文档，game 场景分离至 `general-game-agent` 分支独立推进；当前分支聚焦仿真 & 真机重构 |
+| ![v0.2.2](https://img.shields.io/badge/v0.2.2-11648A) | 2026-05-29 | 基于 ![v0.1.4](https://img.shields.io/badge/v0.1.4-11648A) 的MineCraft通路优化，可以在终端和游戏内下达指令并执行 |
 | ![v0.2.1](https://img.shields.io/badge/v0.2.1-11648A) | 2026-05-29 | 基于 ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) 的MineCraft 就绪，以云端agent接入用户的本地服务器 |
-| ![v0.1.4](https://img.shields.io/badge/v0.1.4-47A882) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
+| ![v0.1.4](https://img.shields.io/badge/v0.1.4-11648A) | 2026-06-5 | 优化用户友好的启动流程; 通信协议规范; 更合理的代码规范; Game Agent & Benchmarking 就绪 |
 | ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) | 2026-05-25 | `PolicySkillRuntime` / `BuiltinSkillRuntime` 边界严格分离，Game Agent & Benchmarking 就绪 |
 | ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | 感知插件体系：`SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` 可审计写回 |
 | ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP：`DummySimTarget` + `DummyAdapter` + `DummyClient` 串行链路 |
@@ -51,7 +51,7 @@ README_zh.md
 <tr><td width="32">🔌</td><td><b>同代码，万硬件</b> — 新增机器人只需实现一个 Target Adapter（~100 行），调度层零改动。</td></tr>
 <tr><td>🛡️</td><td><b>三道安全防线</b> — Critic 校验 → Strict Preflight → Target-side SafetyGuard，真机场景不可绕过。</td></tr>
 <tr><td>📋</td><td><b>全程可审计</b> — 状态、动作、感知结果以 Markdown + YAML 落盘，每一步可追溯复现。</td></tr>
-<tr><td>🔄</td><td><b>零摩擦迁移</b> — 同一套 Session 协议在 sim / real / game 三类 target 上无差别运行。</td></tr>
+<tr><td>🔄</td><td><b>零摩擦迁移</b> — 同一套 Session 协议在 sim / real 2类 target 上无差别运行。</td></tr>
 </table>
 
 <br>
@@ -74,7 +74,7 @@ README_zh.md
 <tr>
   <td>🎯</td>
   <td><b>Target-Configured</b></td>
-  <td><code>game</code> / <code>debug</code> / <code>simulation</code> / <code>real_robot</code> 四类 target，<code>TARGETS.md</code> 统一注册，adapter 按需挂载</td>
+  <td> <code>debug</code> / <code>simulation</code> / <code>real_robot</code> 三类 target，<code>TARGETS.md</code> 统一注册，adapter 按需挂载</td>
 </tr>
 <tr>
   <td>🧩</td>
@@ -212,7 +212,7 @@ PhyAgentOS/
 ├── PhyAgentOS/runtime/        # Track B  ─  执行平面
 │   ├── watchdog/              #   WatchdogSupervisor
 │   ├── sessions/              #   SessionRunner / TargetSessionHandle
-│   ├── targets/               #   RolloutTarget (game·debug·sim·real)
+│   ├── targets/               #   RolloutTarget (debug·sim·real)
 │   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
 │   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
 │   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
@@ -236,7 +236,6 @@ PhyAgentOS/
 
 | | Kind | 位置 | 示例 |
 |:--|:-----|:-----|:-----|
-| 🎮 | `game` | Local | Minecraft、星露谷物语 —— 低成本验证长期决策与记忆 |
 | 🐛 | `debug` | Local | echo / mock / dry-run —— 零硬件验证协议链路 |
 | 🧪 | `simulation` | Remote | RoboCasa、LIBERO —— Benchmark 评测与批量经验挖掘 |
 | 🤖 | `real_robot` | Remote | Franka、Go2、XLeRobot、AgileX PIPER —— 真实运行 |

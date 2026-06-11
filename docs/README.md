@@ -13,7 +13,7 @@ PhyAgentOS 文档体系由四部分组成，分别面向不同读者群：
 | 1 | [框架介绍](zh/01-framework-introduction.md) | 所有人 | 设计理念、技术架构、当前进展、路线图、TODO、Demo |
 | 2 | [用户手册](zh/02-user-manual.md) | 使用者 | 快速开始、场景配置、运行时操作、排障指南 |
 | 3 | [API 开发者手册](zh/03-developer-manual.md) | 开发者 | 接口文档、二次开发、代码风格、实现边界、贡献规则 |
-| 4 | [场景文档](scenarios/game/minecraft/zh/) | 使用者+开发者 | 特定场景的完整部署指南、使用手册、踩坑记录 |
+| 4 | [场景文档](scenarios/) | 使用者+开发者 | 特定场景的完整部署指南、使用手册、踩坑记录 |
 
 ### 阅读路径
 
@@ -24,14 +24,6 @@ PhyAgentOS 文档体系由四部分组成，分别面向不同读者群：
 | 接入新硬件/写驱动 | [Part 3: API 开发者手册 §3.4](zh/03-developer-manual.md#34-二次开发指南) |
 | 开发外部插件 | [Part 3: API 开发者手册 §3.4.3](zh/03-developer-manual.md#343-开发外部插件) |
 | 理解架构全貌 | [Part 1 §1.3](zh/01-framework-introduction.md#13-技术架构) → [Part 3 §3.2](zh/03-developer-manual.md#32-架构深度解析) |
-| 部署 Minecraft Game Agent | [Part 2 §2.6.7](zh/02-user-manual.md#267-minecraft-game-agent) → [场景文档：部署指南](scenarios/game/minecraft/zh/deployment.md) |
-| Minecraft 日常使用 | [场景文档：使用指南](scenarios/game/minecraft/zh/usage.md) |
-
-### 场景文档索引
-
-| 场景 | 部署指南 | 使用指南 | 源码 |
-|------|---------|---------|------|
-| Minecraft Game Agent | [zh](scenarios/game/minecraft/zh/deployment.md) / [en](scenarios/game/minecraft/en/deployment.md) | [zh](scenarios/game/minecraft/zh/usage.md) / [en](scenarios/game/minecraft/en/usage.md) | [bridge_server.js](scenarios/game/minecraft/bridge_server.js) |
 
 ### 版本信息
 
@@ -50,7 +42,7 @@ The PhyAgentOS documentation consists of four parts targeting different audience
 | 1 | [Framework Introduction](en/01-framework-introduction.md) | Everyone | Design philosophy, architecture, progress, roadmap, TODO, demos |
 | 2 | [User Manual](en/02-user-manual.md) | Users | Quick start, scenario configuration, runtime operations, troubleshooting |
 | 3 | [API Developer Manual](en/03-developer-manual.md) | Developers | API reference, secondary development, coding style, boundaries, contribution |
-| 4 | [Scenario Docs](scenarios/game/minecraft/en/) | Users + Devs | Complete deployment guide, usage manual, troubleshooting per scenario |
+| 4 | [Scenario Docs](scenarios/) | Users + Devs | Complete deployment guide, usage manual, troubleshooting per scenario |
 
 ### Reading Path
 
@@ -61,14 +53,6 @@ The PhyAgentOS documentation consists of four parts targeting different audience
 | Add new hardware / write a driver | [Part 3: API Developer Manual §3.4](en/03-developer-manual.md#34-secondary-development-guide) |
 | Develop an external plugin | [Part 3: API Developer Manual §3.4.3](en/03-developer-manual.md#343-developing-external-plugins) |
 | Understand the full architecture | [Part 1 §1.3](en/01-framework-introduction.md#13-technical-architecture) → [Part 3 §3.2](en/03-developer-manual.md#32-architecture-deep-dive) |
-| Deploy Minecraft Game Agent | [Part 2 §2.6.7](en/02-user-manual.md#267-minecraft-game-agent) → [Scenario: Deployment Guide](scenarios/game/minecraft/en/deployment.md) |
-| Daily Minecraft usage | [Scenario: Usage Guide](scenarios/game/minecraft/en/usage.md) |
-
-### Scenario Doc Index
-
-| Scenario | Deployment | Usage | Source |
-|----------|------------|-------|--------|
-| Minecraft Game Agent | [en](scenarios/game/minecraft/en/deployment.md) / [zh](scenarios/game/minecraft/zh/deployment.md) | [en](scenarios/game/minecraft/en/usage.md) / [zh](scenarios/game/minecraft/zh/usage.md) | [bridge_server.js](scenarios/game/minecraft/bridge_server.js) |
 
 ### Version Info
 

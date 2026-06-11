@@ -30,7 +30,7 @@ Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to exec
 - **One Codebase, Any Hardware**: Adding a new robot means implementing one Target Adapter (~100 lines); zero changes to the scheduling layer
 - **Three Safety Layers**: Critic validation → Strict Preflight → Target-side SafetyGuard; mandatory for real-robot deployment
 - **Fully Auditable**: State, actions, and perception results are written to Markdown + YAML files; every step is traceable and reproducible
-- **Zero-Friction Migration**: The same Session protocol runs identically across sim, real, and game targets
+- **Zero-Friction Migration**: The same Session protocol runs identically across sim and real targets
 
 ### Key Metrics
 
@@ -93,14 +93,13 @@ The new architecture upgrades hardware abstraction from "driver-centered" to "se
 - **Old Model (Driver-Centered)**: observe / execute / profile / safety coupled in a single Driver class
 - **New Model (Session-Centered)**: RolloutTarget (what to execute on) + SkillRuntime (how to execute) + TargetAdapter (how to translate) — three-way decoupling
 
-The same Session protocol runs identically across four target kinds: game / debug / simulation / real_robot.
+The same Session protocol runs identically across three target kinds: debug / simulation / real_robot.
 
-### 1.2.4 Three-Scenario Synergy
+### 1.2.4 Two-Scenario Synergy
 
-Three parallel scenarios share the Base Runtime kernel and evolve independently:
+Two parallel scenarios share the Base Runtime kernel and evolve independently:
 
-- **Game Agent (Stardew Valley)**: Low-cost validation of long-term memory and autonomous decision-making → strategies reusable in Sim/Real
-- **Sim (MuJoCo + ManiSkill)**: Benchmark evaluation + batch experience mining → experience transfer to Real
+- **Sim (MuJoCo + ManiSkill)**: Benchmark evaluation + batch experience mining
 - **Real (Mobile Manipulation + Voice)**: Real interaction data → improved Sim fidelity
 
 ---
@@ -124,14 +123,14 @@ Three parallel scenarios share the Base Runtime kernel and evolve independently:
                     │  Critic Validation Framework  │
                     └──────┬──────┬──────┬────────┘
                            │      │      │
-              ┌────────────┼──────┼──────┼────────────┐
-              ▼            ▼      ▼      ▼            ▼
-   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-   │Scn 1: Game   │ │  Scn 2: Sim  │ │ Scn 3: Real  │
-   │Stardew Valley│ │ MuJoCo+      │ │Mobile Mani+  │
-   │Long Memory   │ │ ManiSkill    │ │Voice         │
-   │Autonomous    │ │ Self-Evolve  │ │Human-Like    │
-   └──────────────┘ └──────────────┘ └──────────────┘
+                           │      │      │
+                           ▼      ▼      ▼ 
+                  ┌──────────────┐ ┌──────────────┐
+                  │  Scn 1: Sim  │ │ Scn 2: Real  │
+                  │ MuJoCo+      │ │Mobile Mani+  │
+                  │ ManiSkill    │ │Voice         │
+                  │ Self-Evolve  │ │Human-Like    │
+                  └──────────────┘ └──────────────┘
 ```
 
 ### 1.3.2 Runtime Execution Pipeline
@@ -170,7 +169,7 @@ class BaseRolloutTarget(ABC):
     def get_state(self) -> dict: ...      # Runtime state (for ENVIRONMENT.md writeback)
 ```
 
-WatchdogSupervisor does not need to know whether the Target is a game, simulation, or real robot.
+WatchdogSupervisor does not need to know whether the Target is a simulation or real robot.
 
 ### 1.3.5 Decoupling Boundaries
 
@@ -188,7 +187,7 @@ WatchdogSupervisor does not need to know whether the Target is a game, simulatio
 | Feature | Description |
 |---------|-------------|
 | **Session-Centered Runtime** | `WatchdogSupervisor` → `SessionRunner` → `SkillRuntime` → `TargetSessionHandle` pipeline |
-| **Target-Configured** | `game` / `debug` / `simulation` / `real_robot` four target kinds, registered in `TARGETS.md` |
+| **Target-Configured** | `debug` / `simulation` / `real_robot` three target kinds, registered in `TARGETS.md` |
 | **Adapter + Bridge** | `TargetAdapter` + `PolicyAdapter` + `ActionBridge` three-way decoupling, auto-composed |
 | **Dual Skill Runtimes** | `PolicySkillRuntime` maintains policy closed-loop + `BuiltinSkillRuntime` manages agent interactive loop |
 | **Strict Preflight** | 10 validation checks (target / sensor / perception / contract / tool); rejected before execution |
@@ -209,8 +208,8 @@ WatchdogSupervisor does not need to know whether the Target is a game, simulatio
 | v0.1.0 | 2026-04-29 | Hackathon baseline: plugin-based HAL, ReKep / SAM3 real-robot grasping & VLN full pipeline |
 | v0.1.1 | 2026-05-18 | Session-Centered Runtime MVP: `DummySimTarget` + `DummyAdapter` + `DummyClient` serial pipeline |
 | v0.1.2 | 2026-05-20 | Perception plugin system: `SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` auditable writeback |
-| v0.1.3 | 2026-05-25 | Strict separation of `PolicySkillRuntime` / `BuiltinSkillRuntime`; Game Agent & Benchmarking ready |
-| v0.2.1 | 2026-05-29 | Minecraft ready: cloud agent connects to user's local server |
+| v0.1.3 | 2026-05-25 | Strict separation of `PolicySkillRuntime` / `BuiltinSkillRuntime` |
+| v0.2.1 | 2026-05-29 | LIBERO benchmark remote target server ready |
 
 ### Achieved Capabilities
 
@@ -223,7 +222,6 @@ WatchdogSupervisor does not need to know whether the Target is a game, simulatio
 - Perception pipeline (GeometryPipeline + SegmentationPipeline + FusionPipeline)
 - Semantic navigation (SemanticNavigationTool, semantic goal → physical coordinates)
 - External plugin dynamic loading mechanism
-- Minecraft Game Target (mineflayer HTTP bridge remote control, zero protocol dependencies)
 
 ---
 
@@ -242,7 +240,7 @@ Documents in `plans/` (not ordinary plans, but architecture specifications) defi
 | `BaseDriver` | `RolloutTarget` + `SkillRuntime` + `TargetAdapter` | Split into three first-class objects |
 | `hal_watchdog.py` | `WatchdogSupervisor` | Upgraded from action poller to execution session supervisor |
 | Per-action queue | `SESSIONS.md` | Session schema is the execution queue |
-| Robot-only index | `TARGETS.md` | Unified sim/game/real target registry |
+| Robot-only index | `TARGETS.md` | Unified sim/real target registry |
 | Navigation/ReKep as driver-internal functions | `SkillRuntime` (BuiltinAlgorithmSkillRuntime) | Elevated to first-class skill runtime |
 | Simulation driver | `SimTarget` | Elevated to first-class rollout target |
 
@@ -252,10 +250,9 @@ Documents in `plans/` (not ordinary plans, but architecture specifications) defi
 Phase 0: Base MVP (1-2 weeks)
   → Schema + State I/O + Watchdog + Dummy closed-loop
 
-Phase 1: Three scenarios in parallel (1-2 weeks each, non-blocking)
-  ├── Scenario 1: Stardew Valley Game Agent (current highest priority)
-  ├── Scenario 2: MuJoCo + ManiSkill Simulation
-  └── Scenario 3: Real-Robot Mobile Manipulation + Voice
+Phase 1: Two scenarios in parallel (1-2 weeks each, non-blocking)
+  ├── Scenario 1: MuJoCo + ManiSkill Simulation
+  └── Scenario 2: Real-Robot Mobile Manipulation + Voice
 
 Phase 2: Deep Evolution
   → Policy Server / LIBERO / RoboCasa / Hybrid Skill
@@ -277,19 +274,12 @@ Phase 2: Deep Evolution
 
 ### Short-term Priorities (1-2 months)
 
-1. **Stardew Valley Game Agent (Scenario 1)**
-   - StardewTarget implementation: connect to SMAPI mod (HTTP)
-   - Cross-season long-term memory validation
-   - NPC relationship network social memory training
-   - 14-day autonomous run acceptance test
-   - Achieved: Minecraft Game Target as first game-type Target, validates HTTP bridge remote control pattern (see [User Manual §2.6.7](../02-user-manual.md#267-minecraft-game-agent))
-
-2. **Base Runtime Completion**
+1. **Base Runtime Completion**
    - Session state machine: pending → claimed → running → succeeded / failed / timed_out
    - Goal Graph + Session Compiler
    - Fallback chain mechanism
 
-3. **Perception Deepening**
+2. **Perception Deepening**
    - Standardized camera/LiDAR integration
    - Segmentation model dependency management
    - Scene graph construction and writeback protocol refinement
@@ -335,18 +325,7 @@ Phase 2: Deep Evolution
 - [ ] FailureEscalator (retry / reset / cancel / notify / safety stop)
 - [ ] DummySimTarget + DummyAdapter + DummyClient closed-loop acceptance
 
-### Scenario 1: Stardew Valley Game Agent (Phase 1A, Current Priority)
-
-- [ ] SMAPI Mod development (HTTP API exposing game state)
-- [ ] StardewTarget implementation (build / reset / observe / step / close)
-- [ ] StardewAdapter data transformation (game coords → target coords)
-- [ ] NPC relationship network memory structure
-- [ ] Cross-season / cross-day memory persistence
-- [ ] Planner autonomous goal generation (mining/fishing/social/farming parallel goals)
-- [ ] 14-day autonomous run validation
-- [ ] LESSONS.md game failure experience accumulation
-
-### Scenario 2: MuJoCo + ManiSkill Simulation (Phase 1B)
+### Scenario 1: MuJoCo + ManiSkill Simulation (Phase 1A)
 
 - [ ] ManiSkillTarget implementation (build / observe / step, RGBD + proprioception)
 - [ ] BenchmarkHarness evaluation framework (run_benchmark → BenchmarkResult)
@@ -354,7 +333,7 @@ Phase 2: Deep Evolution
 - [ ] Auto LESSONS.md experience accumulation
 - [ ] Benchmark score tracking and visualization
 
-### Scenario 3: Real Mobile Manipulation + Voice (Phase 1C)
+### Scenario 2: Real Mobile Manipulation + Voice (Phase 1B)
 
 - [ ] CompositeTarget interface definition (multi-robot composition)
 - [ ] SafetyGuard local safety adjudicator
@@ -387,7 +366,6 @@ Phase 2: Deep Evolution
 | Franka QA + Grasping | Franka Research 3 | Real-time dialogue + NL driven grasping |
 | Go2 Semantic Navigation | Unitree Go2 | Semantic goal navigation ("go patrol at the door") |
 | Isaac Sim Composite Operation | PIPER + Go2 | Code-free Isaac Sim environment manipulation |
-| Minecraft Cloud Agent | Minecraft | Cloud agent connecting to local server |
 
 ### Supported Devices
 

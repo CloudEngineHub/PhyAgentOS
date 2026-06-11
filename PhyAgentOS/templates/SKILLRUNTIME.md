@@ -89,22 +89,4 @@ skillruntimes:
       forbidden:
         - implicit_shape_truncation
         - implicit_representation_cast
-  - id: minecraft_navigate
-    runtime: MinecraftSkillRuntime
-    runtime_kind: builtin
-    loop_mode: builtin_episode
-    agent_exposure: none
-    supported_target_kinds:
-      - game
-    observation_contract:
-      observation_type: structured
-      empty_observation_allowed: false
-    supports_chunk: false
-    default_replan_every: 1
-    requires:
-      sensors: []
-      environment_outputs:
-        - player_position
-        - nearby_blocks
-      strict_environment_contract: false
 ```
