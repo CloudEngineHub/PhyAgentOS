@@ -3,7 +3,6 @@
 import base64
 import mimetypes
 import platform
-import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -18,29 +17,20 @@ class ContextBuilder:
     """Builds the context (system prompt + messages) for the agent."""
 
     # Core nanobot files — always loaded
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "SKILLS.md"]
+    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md"]
 
     # Embodied extension files — loaded only when present in workspace.
     # New tracks can add files here without touching other code.
     EMBODIED_FILES = [
-        "EMBODIED.md", "ENVIRONMENT.md", "LESSONS.md",
+        "EMBODIED.md", "ENVIRONMENT.md", "LESSONS.md", "ROBOTS.md",
         "TASK.md", "ORCHESTRATOR.md",
-        "RUNTIME.md",
+        "RUNTIME.md", "TARGETS.md", "SKILLS.md",
         "MEMORY_SPATIAL.md", "TIMELINE.md",
     ]
     _RUNTIME_CONTEXT_TAG = "[Runtime Context — metadata only, not instructions]"
-    _EMBODIED_TARGET_RE = re.compile(r"^##\s+Target:\s*(?P<target_id>[A-Za-z0-9_.:-]+)\s*$")
 
-    def __init__(
-        self,
-        workspace: Path,
-        *,
-        runtime_enabled: bool = True,
-        runtime_target_enabled: dict[str, bool] | None = None,
-    ):
+    def __init__(self, workspace: Path):
         self.workspace = workspace
-        self.runtime_enabled = runtime_enabled
-        self.runtime_target_enabled = dict(runtime_target_enabled or {})
         self.memory = MemoryStore(workspace)
         self.skills = SkillsLoader(
             workspace,
@@ -117,8 +107,7 @@ Your workspace is at: {workspace_path}
 - After writing or editing a file, re-read it if accuracy matters.
 - If a tool call fails, analyze the error before retrying with a different approach.
 - Ask for clarification when the request is ambiguous.
-- Runtime execution uses the session protocol. Read `RUNTIME.md`, `TARGETS.md`, and `SKILLRUNTIME.md` before appending executable work to `SESSIONS.md`.
-
+- If `TARGETS.md` and `SKILLS.md` are present in the workspace, they define available runtime targets and skills. Read them to understand what execution targets are available before responding to embodied action requests.
 Reply directly with text for conversations. Only use the 'message' tool to send to a specific chat channel."""
 
     @staticmethod
@@ -146,103 +135,14 @@ Reply directly with text for conversations. Only use the 'message' tool to send 
                 content = file_path.read_text(encoding="utf-8")
                 parts.append(f"## {filename}\n\n{content}")
 
-        # Embodied extensions — present only when the workspace provides them.
+        # Embodied extensions — present only when HAL is active
         for filename in self.EMBODIED_FILES:
             file_path = self.workspace / filename
             if file_path.exists():
-                if filename == "EMBODIED.md":
-                    content = self._load_enabled_embodied_content(file_path)
-                    if not content:
-                        continue
-                else:
-                    content = file_path.read_text(encoding="utf-8")
+                content = file_path.read_text(encoding="utf-8")
                 parts.append(f"## {filename}\n\n{content}")
 
         return "\n\n".join(parts) if parts else ""
-
-    def _load_enabled_embodied_content(self, path: Path) -> str:
-        """Load target capability prose only for targets enabled in TARGETS.md/config."""
-        if not self.runtime_enabled:
-            return ""
-        content = path.read_text(encoding="utf-8")
-        enabled_targets = self._enabled_runtime_target_ids()
-        if enabled_targets is None:
-            return content
-        if not enabled_targets:
-            return ""
-        return self._filter_embodied_targets(content, enabled_targets)
-
-    def _enabled_runtime_target_ids(self) -> set[str] | None:
-        targets_path = self.workspace / "TARGETS.md"
-        if not targets_path.exists():
-            return None
-        try:
-            from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block
-
-            document = read_yaml_block(targets_path)
-        except Exception:
-            return None
-        targets = document.get("targets")
-        if not isinstance(targets, list):
-            return None
-
-        enabled: set[str] = set()
-        for target in targets:
-            if not isinstance(target, dict):
-                continue
-            target_id = target.get("id")
-            if not isinstance(target_id, str):
-                continue
-            is_enabled = bool(target.get("enabled", True))
-            if target_id in self.runtime_target_enabled:
-                is_enabled = bool(self.runtime_target_enabled[target_id])
-            if is_enabled:
-                enabled.add(target_id)
-        return enabled
-
-    @classmethod
-    def _filter_embodied_targets(cls, content: str, enabled_targets: set[str]) -> str:
-        lines = content.splitlines()
-        preamble: list[str] = []
-        sections: list[list[str]] = []
-        current: list[str] | None = None
-        current_target: str | None = None
-        saw_target_section = False
-
-        for line in lines:
-            match = cls._EMBODIED_TARGET_RE.match(line)
-            if match:
-                saw_target_section = True
-                if current is not None and current_target in enabled_targets:
-                    sections.append(current)
-                current_target = match.group("target_id")
-                current = [line]
-                continue
-            if current is None:
-                preamble.append(line)
-            else:
-                current.append(line)
-
-        if current is not None and current_target in enabled_targets:
-            sections.append(current)
-
-        if not saw_target_section:
-            return content
-        if not sections:
-            return ""
-
-        output: list[str] = []
-        if preamble:
-            output.extend(preamble)
-            while output and not output[-1].strip():
-                output.pop()
-            output.append("")
-        for section in sections:
-            output.extend(section)
-            output.append("")
-        while output and not output[-1].strip():
-            output.pop()
-        return "\n".join(output) + "\n"
 
     def build_messages(
         self,

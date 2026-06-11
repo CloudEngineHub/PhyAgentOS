@@ -981,14 +981,5 @@ def _login_github_copilot() -> None:
 
 
 
-# ============================================================================
-# Minecraft Commands — see cli/minecraft_commands.py
-# ============================================================================
-
-from PhyAgentOS.cli.minecraft_commands import minecraft_app
-
-app.add_typer(minecraft_app, name="minecraft")
-
-
 if __name__ == "__main__":
     app()

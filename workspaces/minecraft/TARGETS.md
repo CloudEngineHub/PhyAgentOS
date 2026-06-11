@@ -45,7 +45,7 @@ targets:
       target_adapter: target_adapter://minecraft_adapter
       runtime_contract_ref: configs/runtime/contracts/minecraft.runtime.yaml
     config:
-      bridge_url: ""
+      bridge_url: "https://carucated-kattie-cryptogamic.ngrok-free.dev"
       verify_ssl: false
       step_delay: 0.1
 ```

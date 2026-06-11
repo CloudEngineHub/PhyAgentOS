@@ -245,6 +245,8 @@ class MinecraftTarget(BaseLocalTarget):
             "executed_steps": self._step_idx,
             "success": bool(last.get("info", {}).get("success")),
             "done": bool(last.get("done")),
+            "ok": bool(last.get("info", {}).get("ok", True)),
+            "result": str(last.get("info", {}).get("result", "")),
         }
         return self._last_status
 
