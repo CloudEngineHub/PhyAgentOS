@@ -89,4 +89,31 @@ skillruntimes:
       forbidden:
         - implicit_shape_truncation
         - implicit_representation_cast
+  - id: forge_gateway_sam3
+    runtime: ForgeGatewaySkillRuntime
+    runtime_kind: builtin
+    loop_mode: gateway_single_action
+    agent_exposure: none
+    supported_target_kinds:
+      - simulation
+      - real_robot
+    observation_contract:
+      observation_type: empty
+      empty_observation_allowed: true
+      empty_observation_semantics: gateway_runtime_context
+    supports_chunk: false
+    default_replan_every: 1
+    requires:
+      sensors: []
+      environment_outputs: []
+      strict_environment_contract: false
+    input_contract:
+      gateway_action:
+        required: true
+        fields:
+          - action_type
+          - inputs
+    output_contract:
+      gateway_result:
+        status_source: /agent/sessions/{session_id}
 ```

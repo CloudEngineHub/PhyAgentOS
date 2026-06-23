@@ -63,4 +63,29 @@ targets:
       max_chunk_size: 50
       max_steps: 280
       num_steps_wait: 10
+  - id: forge_gateway
+    target_class: remote
+    target_kind: simulation
+    enabled: true
+    workspace: workspaces/forge_gateway
+    supported_skillruntimes:
+      - forge_gateway_sam3
+    runtime:
+      target_runtime: ForgeGatewayRuntime
+      target_endpoint: http://127.0.0.1:9001
+      target_adapter: target_adapter://forge_gateway_passthrough
+      runtime_contract_ref: configs/runtime/contracts/forge_gateway.runtime.yaml
+    observation:
+      observation_type: empty
+      empty_observation_allowed: true
+      empty_observation_semantics: gateway_runtime_context
+    perception:
+      enabled: false
+      strict_preflight: true
+      sensor_config_ref: null
+      perception_config_ref: null
+      artifact_dir: null
+    config:
+      gateway_api: paos-forge-gateway-mvp-plus.v1
+      action_manifest: actions/piper/sam3.md
 ```

@@ -13,6 +13,8 @@ if str(ROOT) not in sys.path:
 
 from PhyAgentOS.runtime.watchdog.supervisor import WatchdogSupervisor
 
+REQUIRED_RUNTIME_FILES = ("TARGETS.md", "SKILLRUNTIME.md", "SESSIONS.md")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run PhyAgentOS runtime v2 watchdog")
@@ -24,7 +26,19 @@ def main() -> int:
     parser.add_argument("--once", action="store_true", help="Run one polling pass and exit")
     args = parser.parse_args()
 
-    supervisor = WatchdogSupervisor(args.workspace, environment_workspace=args.environment_workspace)
+    workspace = Path(args.workspace).expanduser()
+    missing = [name for name in REQUIRED_RUNTIME_FILES if not (workspace / name).exists()]
+    if missing:
+        print(
+            "Runtime workspace is missing required files: "
+            + ", ".join(missing)
+            + "\nInitialize it first:\n"
+            + f"  python scripts/init_runtime_workspace.py --workspace {workspace}",
+            file=sys.stderr,
+        )
+        return 2
+
+    supervisor = WatchdogSupervisor(workspace, environment_workspace=args.environment_workspace)
     if args.once:
         return 0 if supervisor.run_once() else 1
 

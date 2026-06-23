@@ -20,6 +20,7 @@ RUNTIME_TEMPLATE_NAMES = ("TARGETS.md", "SKILLRUNTIME.md")
 RUNTIME_CONFIG_TEMPLATE_NAMES = (
     "configs/runtime/contracts/dummy_sim.runtime.yaml",
     "configs/runtime/contracts/libero_real.runtime.yaml",
+    "configs/runtime/contracts/forge_gateway.runtime.yaml",
     "configs/runtime/sensors/dummy_sim.sensors.yaml",
 )
 _RUNTIME_INSTRUCTIONS = """# Runtime Protocol
@@ -93,6 +94,82 @@ Rules:
   provides a different endpoint.
 - Do not manually edit `ENVIRONMENT.md`; it is runtime state managed by
   PhyAgentOS.
+
+## Forge Gateway MVP+
+
+When an enabled target uses `target_runtime: ForgeGatewayRuntime` and a
+skillruntime uses `runtime: ForgeGatewaySkillRuntime`, the watchdog sends one
+high-level action to the Forge Gateway `/agent/sessions` API instead of running
+the legacy target / policy loop.
+
+Gateway sessions require `runtime_hints.gateway_action`:
+
+```yaml
+runtime_hints:
+  gateway_action:
+    action_type: grasp
+    target_name: apple
+    source: paos-agent
+    inputs:
+      auto_home: false
+```
+
+Rules:
+
+- Use `routing.target_endpoint` or `TARGETS.md runtime.target_endpoint` as the
+  Forge Gateway HTTP base URL, for example `http://127.0.0.1:9001`.
+- `session_id` is forwarded to Gateway; PAOS generates `command_id` as
+  `cmd_{session_id}` unless `gateway_action.command_id` is provided.
+- Gateway MVP+ is serial: do not create concurrent pending sessions for the
+  same robot.
+- A Gateway `succeeded` status is command-level success. Treat physical task
+  success as `not_verified` unless a verifier or human observation confirms it.
+
+### SAM3 Gateway Action Mapping
+
+For SAM3 / Piper Gateway sessions, preserve PAOS Agent semantics: translate the
+user's natural-language intent into a runtime session, then append it to
+`SESSIONS.md`. Do not call Forge Gateway directly from the Agent.
+
+Use this default target and skillruntime when they are enabled and support the
+requested action:
+
+```yaml
+target_ref: target://forge_gateway
+skillruntime_ref: skillruntime://forge_gateway_sam3
+routing:
+  target_endpoint: http://127.0.0.1:9001
+  policy_endpoint: null
+```
+
+Natural-language mapping:
+
+- "抓取/拿起/取/夹取 <object>" or "grasp/pick up <object>" ->
+  `gateway_action.action_type: grasp`, `gateway_action.target_name: <object>`.
+- "放置/放下/放到 <place>" or "place/put down <object>" ->
+  `gateway_action.action_type: place`, include `target_name` or placement text
+  when the user provides it.
+- "检查/确认/看一下是否有 <object>" or "check/find <object>" ->
+  `gateway_action.action_type: check_target`, `gateway_action.target_name: <object>`.
+- "回到初始位/回零/回家" or "go home/reset pose" ->
+  `gateway_action.action_type: go_home`.
+- "场景复位/重置仿真环境/reset scene" -> do not edit `SESSIONS.md`.
+  Execute the Agent command adapter instead:
+  `python -m PhyAgentOS.runtime.gateway.command_adapter --workspace <runtime_workspace> reset`.
+  This calls `POST /agent/runtime/reset`, which is not a session action.
+
+Gateway session rules:
+
+- Use a short unique `session_id`, for example
+  `sess_gateway_grasp_apple_<short_suffix>`.
+- Put the original user request in `task_description`.
+- Set `runtime_hints.gateway_action.source: paos-agent`.
+- Put extra action arguments under `runtime_hints.gateway_action.inputs`.
+- For grasp-like actions, default `inputs.auto_home` to `false` unless the user
+  asks to return home automatically.
+- If the user asks for a multi-step task, create one pending session at a time
+  and wait for the previous Gateway session to reach a terminal state before
+  appending the next one.
 """
 
 
