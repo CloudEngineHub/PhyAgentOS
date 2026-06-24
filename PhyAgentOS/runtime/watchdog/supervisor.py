@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from PhyAgentOS.runtime.gateway import GatewaySessionRunner
 from PhyAgentOS.runtime.perception import PerceptionRuntime
 from PhyAgentOS.runtime.policy.factory import build_policy_client
 from PhyAgentOS.runtime.preflight import RuntimeCompatibilityPreflight
@@ -72,6 +73,30 @@ class WatchdogSupervisor:
             self.registry.mark_preflight_checking(session_id)
             session = self.registry.get_session(session_id)
             scheduled = self.scheduler.resolve_session(session, targets_doc, skillruntimes_doc)
+            if self._is_gateway_session(scheduled):
+                # Compatibility bridge: Phase-3 PAOS still queues Gateway work
+                # through SESSIONS.md. The next adapter should call
+                # ForgeGatewayClient directly from the Agent command layer.
+                if not scheduled.target_spec.enabled:
+                    raise SchemaValidationError(f"target {scheduled.target_id} is disabled")
+                self.registry.mark_running(session_id)
+                session = self.registry.get_session(session_id)
+                scheduled = self.scheduler.resolve_session(session, targets_doc, skillruntimes_doc)
+                result = GatewaySessionRunner(
+                    session=session,
+                    target_spec=scheduled.target_spec,
+                    skillruntime_spec=scheduled.skillruntime_spec,
+                ).run()
+                self.registry.mark_finalizing(session_id)
+                result = self.result_writer.write_episode(
+                    session,
+                    scheduled.target_spec,
+                    scheduled.skillruntime_id,
+                    result,
+                )
+                self.result_writer.write_session_history(session, scheduled.target_spec, result)
+                self.registry.mark_finished(session_id, result)
+                return True
             health_report = self.health_monitor.preflight(scheduled)
             if not health_report.ok:
                 raise SchemaValidationError(health_report.summary())
@@ -211,6 +236,12 @@ class WatchdogSupervisor:
             timeout_s=session.timeouts.policy_timeout_s,
             action_dim=int(action_dim),
             chunk_size=int(chunk_size),
+        )
+
+    def _is_gateway_session(self, scheduled) -> bool:
+        return (
+            scheduled.skillruntime_spec.runtime == "ForgeGatewaySkillRuntime"
+            or scheduled.target_spec.runtime.target_runtime == "ForgeGatewayRuntime"
         )
 
     def _close_policy_client(self, policy_client) -> None:

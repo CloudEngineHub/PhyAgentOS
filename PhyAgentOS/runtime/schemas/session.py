@@ -100,6 +100,7 @@ class SessionRuntimeHints(BaseModel):
     perception_queries: list[dict[str, Any]] = Field(default_factory=list)
     force_environment_refresh: bool = False
     preferred_replan_every_steps: int | None = None
+    gateway_action: dict[str, Any] = Field(default_factory=dict)
 
 
 class SessionSafetyProfile(BaseModel):
