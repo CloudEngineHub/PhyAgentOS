@@ -4,13 +4,70 @@
 
 ## Quick Start
 
-### 1. 启动 Forge Gateway Dataflow
+### 1. 拉取 SAM3 Forge Bundle
 
-以 `sam3_grasp_runner` 仿真为例：
+从 `PhyAgentOS` 仓库目录执行：
 
 ```bash
-cd /path/to/sam3_grasp_runner
-bash scripts/run_sim_rgbd.sh
+cd /path/to/PhyAgentOS
+bash examples/fetch_forge_sam3_bundle.sh
+```
+
+默认会下载并解压到与 `PhyAgentOS` 同级的：
+
+```text
+../sam3_bundle
+```
+
+该 bundle 内已经包含 Forge runtime 二进制、策略二进制、dataflow、配置和启动脚本。
+
+可选环境变量：
+
+```bash
+VERSION=latest bash examples/fetch_forge_sam3_bundle.sh
+```
+
+如对象存储路径变化，可覆盖：
+
+```bash
+SAM3_URL='https://.../sam3_bundle.zip' bash examples/fetch_forge_sam3_bundle.sh
+SAM3_BASE_URL='https://.../sam3_bundle/${VERSION}' bash examples/fetch_forge_sam3_bundle.sh
+```
+
+### 2. 按 bundle 内说明准备运行文件
+
+进入 bundle：
+
+```bash
+cd ../sam3_bundle
+```
+
+按 bundle 内 `README.md` 准备：
+
+- `sam3.pt`
+- 真机需要的 `calibration_result.npz`
+- 真机相机内参：`configs/real/sam3_policy.yaml`
+
+手眼标定流程见 bundle 内：
+
+```text
+docs/handeye-calibration.md
+```
+
+### 3. 启动 Forge Gateway Dataflow
+
+仿真：
+
+```bash
+cd ../sam3_bundle
+SAM3_SKIP_UV_SYNC=1 bash scripts/run_sim_rgbd.sh
+```
+
+真机：
+
+```bash
+cd ../sam3_bundle
+SAM3_SKIP_UV_SYNC=1 bash scripts/run_real.sh
 ```
 
 确认 Gateway 可访问：
@@ -28,7 +85,7 @@ curl -sS http://127.0.0.1:9001/agent/runtime/capabilities | jq
 - `actions.check_target`
 - `actions.go_home`
 
-### 2. 初始化 PAOS Runtime Workspace
+### 4. 初始化 PAOS Runtime Workspace
 
 ```bash
 cd /path/to/PhyAgentOS
@@ -46,7 +103,7 @@ python scripts/init_runtime_workspace.py --workspace ~/.PhyAgentOS/workspace
 
 如果文件已存在，默认不会覆盖；只有需要重置模板时才使用 `--force`。
 
-### 3. 启用 Forge Gateway Target
+### 5. 启用 Forge Gateway Target
 
 在 `~/.PhyAgentOS/workspace/TARGETS.md` 中启用 `forge_gateway`：
 
@@ -67,7 +124,7 @@ python scripts/init_runtime_workspace.py --workspace ~/.PhyAgentOS/workspace
 
 `target_endpoint` 指向 Forge Gateway HTTP 地址。旧 workspace 可能仍使用 `forge_gateway_piper_sim`，建议迁移到 `forge_gateway`。
 
-### 4. 启动 PAOS Agent
+### 6. 启动 PAOS Agent
 
 开发分支验证时推荐使用源码入口，避免加载环境中旧版 `paos`：
 

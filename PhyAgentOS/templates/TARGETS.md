@@ -88,4 +88,38 @@ targets:
     config:
       gateway_api: paos-forge-gateway-mvp-plus.v1
       action_manifest: actions/piper/sam3.md
+  - id: unitree_r1_a5
+    target_class: remote
+    target_kind: real_robot
+    embodiment: unitree_r1_a5
+    enabled: true
+    workspace: workspaces/unitree_r1_a5
+    supported_skillruntimes: []
+    runtime:
+      target_runtime: RemoteTargetProxy
+      target_endpoint: null
+      target_adapter: target_adapter://unitree_r1_a5_observation_adapter
+      runtime_contract_ref: configs/runtime/contracts/unitree_r1_a5_observation.runtime.yaml
+    observation:
+      observation_type: empty
+      empty_observation_allowed: true
+      empty_observation_semantics: Unitree R1 A5 retail demo is observation-only; no low-level command session is configured.
+    perception:
+      enabled: false
+      strict_preflight: true
+      sensor_config_ref: null
+      perception_config_ref: null
+      artifact_dir: null
+    config:
+      network_interface: enx9c69d373a448
+      host_ip: 192.168.123.164
+      robot_ip: 192.168.123.161
+      subnet_prefix: 24
+      nm_profile_name: unitree-r1
+      control_hz: 500
+      state_timeout: 5.0
+      lifecycle_move_duration: 3.0
+      command_timeout: 0.25
+      is_follower: false
+      debug: false
 ```
