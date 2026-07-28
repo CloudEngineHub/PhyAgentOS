@@ -21,6 +21,7 @@ RUNTIME_CONFIG_TEMPLATE_NAMES = (
     "configs/runtime/contracts/dummy_sim.runtime.yaml",
     "configs/runtime/contracts/libero_real.runtime.yaml",
     "configs/runtime/contracts/forge_gateway.runtime.yaml",
+    "configs/runtime/contracts/unitree_r1_a5_observation.runtime.yaml",
     "configs/runtime/sensors/dummy_sim.sensors.yaml",
 )
 _RUNTIME_INSTRUCTIONS = """# Runtime Protocol
