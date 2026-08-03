@@ -1,4 +1,4 @@
-"""Agent-owned child HTTP service for semantic session verification."""
+"""Agent-owned child HTTP service for semantic Forge task verification."""
 
 from __future__ import annotations
 
@@ -16,13 +16,13 @@ from typing import Any
 from urllib import error as url_error
 from urllib import request as url_request
 
-from PhyAgentOS.runtime.schemas import VerificationVerdict
+from PhyAgentOS.verification.contracts import VerificationVerdict
 from PhyAgentOS.verification.engine import VerificationEngine
 
 VERIFICATION_CLIENT_TIMEOUT_GRACE_S = 15.0
 
-SESSION_PROMPT = """You are the semantic verifier for a physical Agent session.
-Judge only the supplied task goal and success criteria. Runtime command success is execution evidence,
+FORGE_TASK_PROMPT = """You are the semantic verifier for a physical Agent task.
+Judge only the supplied task goal and success criteria. Gateway command success is execution evidence,
 not proof that the task goal is complete. Return exactly one JSON object with:
 - verdict: success | failure | replan_required | inconclusive
 - criteria: an array with one item per success criterion; each item has criterion,
@@ -119,13 +119,13 @@ class VerificationServiceProcess:
                 process.kill()
                 process.wait(timeout=2.0)
 
-    def verify_session(self, content: list[dict[str, Any]]) -> dict[str, Any]:
+    def verify_task(self, content: list[dict[str, Any]]) -> dict[str, Any]:
         payload = json.dumps(
-            {"version": "agent_session_verification_v3", "content": content},
+            {"version": "forge_verification_request_v1", "content": content},
             ensure_ascii=False,
         ).encode("utf-8")
         req = url_request.Request(
-            self._url("/v1/verify-session"),
+            self._url("/v1/verify-task"),
             data=payload,
             headers={
                 "Content-Type": "application/json",
@@ -146,22 +146,22 @@ class VerificationServiceProcess:
         except url_error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace").strip()
             raise VerificationServiceError(
-                f"session verification service returned HTTP {exc.code}: "
+                f"task verification service returned HTTP {exc.code}: "
                 f"{(detail or str(exc.reason))[:500]}"
             ) from exc
         except (OSError, TimeoutError, url_error.URLError) as exc:
             raise VerificationServiceError(
-                f"session verification service request failed: {str(exc) or type(exc).__name__}"
+                f"task verification service request failed: {str(exc) or type(exc).__name__}"
             ) from exc
         try:
             data = json.loads(body)
         except json.JSONDecodeError as exc:
             raise VerificationServiceError(
-                "session verification service returned invalid JSON"
+                "task verification service returned invalid JSON"
             ) from exc
         if not isinstance(data, dict):
             raise VerificationServiceError(
-                "session verification service response must be a JSON object"
+                "task verification service response must be a JSON object"
             )
         return data
 
@@ -189,7 +189,7 @@ def _handler(engine: VerificationEngine, session_token: str):
             )
 
         def do_POST(self) -> None:  # noqa: N802
-            if self.path != "/v1/verify-session":
+            if self.path != "/v1/verify-task":
                 self._send({"error": "not found"}, 404)
                 return
             if self.headers.get("X-PAOS-Admin-Token") != session_token:
@@ -200,17 +200,17 @@ def _handler(engine: VerificationEngine, session_token: str):
                     self.rfile.read(int(self.headers.get("Content-Length") or 0))
                 )
                 if (
-                    payload.get("version") != "agent_session_verification_v3"
+                    payload.get("version") != "forge_verification_request_v1"
                     or not isinstance(payload.get("content"), list)
                 ):
-                    raise ValueError("unsupported session verification bundle")
+                    raise ValueError("unsupported Forge verification request")
             except Exception as exc:
                 self._send({"error": str(exc) or type(exc).__name__}, 400)
                 return
             try:
                 data = asyncio.run(
                     engine.complete(
-                        system_prompt=SESSION_PROMPT,
+                        system_prompt=FORGE_TASK_PROMPT,
                         content=payload["content"],
                     )
                 )

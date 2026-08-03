@@ -1,279 +1,104 @@
-<div align="center">
-  <img src="docs/imgs/logo_en.png" alt="PhyAgentOS" width="560">
+# PhyAgentOS
 
-  <h3>Cognitive-Physical Decoupling — A Session-Centered Runtime for Embodied Intelligence</h3>
+PhyAgentOS is an agent framework with one robot execution path: Forge Gateway 1.0.0. The Agent plans a high-level action, the Forge adapter executes it, captures before/after evidence, and invokes a task-level verifier before reporting success.
 
-  <p>
-    <a href="https://github.com/PhyAgentOS/PhyAgentOS/stargazers">
-      <img src="https://img.shields.io/github/stars/PhyAgentOS/PhyAgentOS?style=social" alt="Stars">
-    </a>
-    <a href="https://github.com/PhyAgentOS/PhyAgentOS/network/members">
-      <img src="https://img.shields.io/github/forks/PhyAgentOS/PhyAgentOS?style=social" alt="Forks">
-    </a>
-  </p>
-  <p>
-    <img src="https://img.shields.io/badge/Python-≥3.11-3776AB?logo=python&logoColor=white" alt="Python">
-    <img src="https://img.shields.io/badge/License-MIT-3DA639" alt="License">
-    <a href="https://phy-agent-os.net/">
-      <img src="https://img.shields.io/badge/🌐_Website-online-FF6B35" alt="Website">
-    </a>
-    <a href="https://github.com/PhyAgentOS/PhyAgentOS">
-      <img src="https://img.shields.io/badge/PRs-Welcome-2EA44F" alt="PRs">
-    </a>
-  </p>
-  <p>
-    <sub><a href="./README.md">English</a> · <a href="./README_zh.md">中文</a></sub>
-  </p>
-</div>
+[中文说明](README_zh.md) · [Forge guide](docs/forge/README.md) · [User manual](docs/en/02-user-manual.md) · [Developer manual](docs/en/03-developer-manual.md)
 
----
+## Architecture
 
-## 📢 Changelog
-
-| Version | Date | Update |
-|:------|:-----|:-------|
-| ![v0.1.5](https://img.shields.io/badge/v0.1.5-47A882) | 2026-06-11 | Cleaned protocol files and docs; game scenario separated to `general-game-agent` branch; main branch now focused on sim & real |
-| ![v0.1.4](https://img.shields.io/badge/v0.1.4-11648A) | 2026-06-5 | Optimize the user-friendly onboarding process; Communication Protocol Specification; More reasonable coding standards; Game Agent & Benchmarking ready |
-| ![v0.1.3](https://img.shields.io/badge/v0.1.3-11648A) | 2026-05-25 | Strict separation of `PolicySkillRuntime` / `BuiltinSkillRuntime`; Game Agent & Benchmarking ready |
-| ![v0.1.2](https://img.shields.io/badge/v0.1.2-11648A) | 2026-05-20 | Perception plugin system: `SensorConfig` / `PerceptionConfig` YAML + `EnvironmentWriter` auditable writeback |
-| ![v0.1.1](https://img.shields.io/badge/v0.1.1-11648A) | 2026-05-18 | Session-Centered Runtime MVP: `DummySimTarget` + `DummyAdapter` + `DummyClient` serial pipeline |
-| ![v0.1.0](https://img.shields.io/badge/v0.1.0-11648A) | 2026-04-29 | Hackathon baseline: plugin-based HAL, ReKep / SAM3 real-robot grasping & VLN full pipeline |
-
----
-
-## 🤔 Why PhyAgentOS?
-
-Traditional "LLM-direct-to-hardware" approaches tightly couple reasoning to execution — switching robots means rewriting the entire pipeline. PhyAgentOS changes this through **Cognitive-Physical Decoupling + Session-Centered Runtime**:
-
-<table>
-<tr><td width="32">🔌</td><td><b>One Codebase, Any Hardware</b> — Adding a new robot means implementing one Target Adapter (~100 lines); zero changes to the scheduling layer.</td></tr>
-<tr><td>🛡️</td><td><b>Three Safety Layers</b> — Critic validation → Strict Preflight → Target-side SafetyGuard; mandatory for real-robot deployment.</td></tr>
-<tr><td>📋</td><td><b>Fully Auditable</b> — State, actions, and perception results are written to Markdown + YAML files; every step is traceable and reproducible.</td></tr>
-<tr><td>🔄</td><td><b>Zero-Friction Migration</b> — The same Session protocol runs identically across sim and real targets.</td></tr>
-</table>
-
-<br>
-
-<div align="center">
-  <img src="docs/imgs/framework.png" alt="Architecture" width="960">
-  <p><sub>▲ Session-Centered Runtime Architecture Overview</sub></p>
-</div>
-
----
-
-## ✨ Core Features
-
-<table>
-<tr>
-  <td width="32">🔄</td>
-  <td width="165"><b>Session-Centered Runtime</b></td>
-  <td><code>WatchdogSupervisor</code> → <code>SessionRunner</code> → <code>SkillRuntime</code> → <code>TargetSessionHandle</code> execution pipeline, replacing the legacy Driver-Center architecture</td>
-</tr>
-<tr>
-  <td>🎯</td>
-  <td><b>Target-Configured</b></td>
-  <td>Three target kinds — <code>debug</code> / <code>simulation</code> / <code>real_robot</code> — registered in <code>TARGETS.md</code>, adapters attached on demand</td>
-</tr>
-<tr>
-  <td>🧩</td>
-  <td><b>Adapter + Bridge</b></td>
-  <td><code>TargetAdapter</code> + <code>PolicyAdapter</code> + <code>ActionBridge</code> three-way decoupling with explicit observation/action contracts; <code>AdapterPlan</code> auto-composed, eliminating target×skill combinatorial explosion</td>
-</tr>
-<tr>
-  <td>⚡</td>
-  <td><b>Dual Skill Runtimes</b></td>
-  <td><code>PolicySkillRuntime</code> maintains policy closed-loop + <code>BuiltinSkillRuntime</code> manages agent interactive loop</td>
-</tr>
-<tr>
-  <td>🛡️</td>
-  <td><b>Strict Preflight</b></td>
-  <td>Runtime validation checks (target / sensor / perception / adapter contract / action contract / tool); failures are <code>rejected</code> before execution starts</td>
-</tr>
-<tr>
-  <td>📝</td>
-  <td><b>File Protocol Matrix</b></td>
-  <td><code>TARGETS.md</code> · <code>SKILLRUNTIME.md</code> · <code>SESSIONS.md</code> · <code>ENVIRONMENT.md</code> · <code>LESSONS.md</code> + external YAML configs</td>
-</tr>
-<tr>
-  <td>🔐</td>
-  <td><b>Multi-Layer Safety</b></td>
-  <td>Critic validation → Preflight contract checks → Target-side SafetyGuard → Operator Override</td>
-</tr>
-<tr>
-  <td>🌐</td>
-  <td><b>Fleet Mode</b></td>
-  <td>Multi-robot coordination with shared + per-robot workspaces, priority-based serial scheduling</td>
-</tr>
-</table>
-
----
-
-## 🚀 5-Minute Quick Start
-
-<table>
-<tr>
-<td width="28" align="center">1</td>
-<td>
-
-**Install**
-
-```bash
-git clone https://github.com/PhyAgentOS/PhyAgentOS.git && cd PhyAgentOS
-pip install -e .            # Python ≥ 3.11
-pip install -e ".[dev]"     # Dev dependencies
+```text
+User / channel
+      │
+      ▼
+Agent Planner ── Forge tools ──► ForgeSessionOrchestrator
+                                      │
+                   ┌──────────────────┼──────────────────┐
+                   ▼                  ▼                  ▼
+             ForgeAdapter       SQLite event log   ForgeTaskVerifier
+                   │                  │                  │
+                   ▼                  ▼                  ▼
+          Forge Gateway 1.0.0    public contracts   verdict / recovery
+                   │
+                   ▼
+             Forge + Dora
 ```
-</td>
-</tr>
-<tr>
-<td align="center">2</td>
-<td>
 
-**Initialize Workspace**
+Gateway `succeeded` is an execution fact. For `enforce` and `recovery` tasks, task success comes from the semantic verification verdict.
+
+## Install
 
 ```bash
+git clone https://github.com/HKUDS/PhyAgentOS.git
+cd PhyAgentOS
+pip install -e .
 paos onboard
 ```
-</td>
-</tr>
-<tr>
-<td align="center">3</td>
-<td>
 
-**Start Agent**
+Configure the model provider and the single Forge endpoint in `~/.PhyAgentOS/config.json`:
+
+```json
+{
+  "agents": {
+    "verification": {
+      "serviceEnabled": true,
+      "evidenceRetention": "failed",
+      "maxReplansPerEpisode": 2
+    }
+  },
+  "forge": {
+    "enabled": true,
+    "baseUrl": "http://127.0.0.1:9001",
+    "apiVersion": "paos-forge-gateway-mvp-plus.v1",
+    "requestTimeoutS": 10,
+    "pollIntervalS": 0.5,
+    "executionTimeoutS": 300,
+    "evidence": {
+      "requiredImageSources": ["front"],
+      "captureTimeoutS": 5,
+      "postCaptureTimeoutS": 5,
+      "maxArtifactBytes": 8388608,
+      "associationQuality": "best_effort"
+    }
+  }
+}
+```
+
+Start an interactive Agent or the multi-channel gateway:
 
 ```bash
 paos agent
+paos gateway
 ```
-</td>
-</tr>
-<tr>
-<td align="center">4</td>
-<td>
 
-**Optional: Connect Runtime Services**
+## Forge tools
+
+- `forge_execute_task` submits one action asynchronously and generates fresh PAOS session and command IDs.
+- `forge_get_session` returns persisted request, execution, evidence, verdict, and recovery state.
+- `forge_cancel_session` cancels active execution or recovery.
+- `forge_get_context` reads live capabilities, readiness, and context.
+- `forge_reset` explicitly resets an idle Gateway.
+- `verify_forge_session` performs a non-destructive review of retained evidence.
+- `create_replanned_forge_session` atomically creates a new child for a parent awaiting recovery.
+
+Verification modes are `off`, `audit`, `enforce`, and `recovery`. Every non-`off` task requires a goal and at least one success criterion.
+
+## Persistence
+
+The orchestrator stores state and its append-only event history in `<workspace>/.paos/forge/orchestrator.sqlite3`. Evidence and public contract artifacts are under `<workspace>/artifacts/forge/<session_id>/`. Dispatch attempts are persisted before Gateway submission so a restart never blindly repeats an action.
+
+`EMBODIED.md`, `ENVIRONMENT.md`, and SceneGraph remain knowledge/context surfaces. They are not execution queues.
+
+## Development
 
 ```bash
-# LIBERO benchmark TargetWS machine
-MUJOCO_GL=egl PYTHONWARNINGS=ignore \
-conda run -n liberopi python PhyAgentOS/runtime/targets/remote/libero/server.py \
-  --host 0.0.0.0 --port 9002
-
-# pi0.5 policy machine
-conda run -n lerobot-pi python -m PhyAgentOS.runtime.policy.openpi.lerobot_pi0_server \
-  --model-dir /path/to/pi05/checkpoint --host 0.0.0.0 --port 8000
-```
-</td>
-</tr>
-</table>
-
-`paos agent` and `paos gateway` create the runtime workspace and start the
-session watchdog automatically when runtime is enabled in config. Runtime
-targets are declared in `TARGETS.md`, executable runtimes in `SKILLRUNTIME.md`,
-and the Agent queues work by appending sessions to `SESSIONS.md`.
-
-```bash
-paos agent -m "run the configured LIBERO benchmark task"
+pip install -e '.[dev]'
+pytest
+ruff check PhyAgentOS tests
+python -m compileall -q PhyAgentOS tests
 ```
 
----
+The supported Gateway contract is documented in [docs/forge/README.md](docs/forge/README.md). Historical design reports are kept under `plan/`.
 
-## 🗂️ Protocol Files
+## License
 
-| Context Loading | File | Owner | Purpose |
-|:--|:--|:--|:--|
-| Always loaded into the agent system prompt | `AGENTS.md` | Agent workspace | Project-level operating rules for the agent |
-| Always loaded into the agent system prompt | `SOUL.md` | Agent workspace | Identity, high-level behavior, and assistant style |
-| Always loaded into the agent system prompt | `USER.md` | Agent workspace | User preferences and durable profile notes |
-| Always loaded into the agent system prompt | `TOOLS.md` | Agent workspace | Tool usage policy and available tool guidance |
-| Always loaded into the agent system prompt | `SKILLS.md` | Agent workspace | Agent-facing skill discovery and loading rules |
-| Loaded when present; filtered by enabled runtime targets where applicable | `EMBODIED.md` | Agent workspace | Human-readable target capability descriptions |
-| Loaded when present as state, not bootstrap policy | `ENVIRONMENT.md` | Agent/runtime workspace | Current target and scene/environment state |
-| Loaded when present as memory/state | `LESSONS.md` | Agent workspace | Operational lessons and failure notes |
-| Loaded when present as task state | `TASK.md` | Agent workspace | Multi-step task decomposition and progress |
-| Runtime protocol; read before scheduling sessions | `RUNTIME.md` | Runtime workspace | Instructions for writing valid runtime sessions |
-| Runtime protocol; read before scheduling sessions | `TARGETS.md` | Runtime workspace | Enabled targets, endpoint/adapter/config references, supported skill runtimes |
-| Runtime protocol; read before scheduling sessions | `SKILLRUNTIME.md` | Runtime workspace | Policy/builtin skill runtime registry and execution contracts |
-| Runtime queue/state; written by Agent and watchdog | `SESSIONS.md` | Runtime workspace | Pending/running/completed execution sessions and results |
-
-`SKILLS.md` is for agent capabilities and skill discovery. `SKILLRUNTIME.md` is
-for runtime execution contracts; it is paired with `TARGETS.md` and `SESSIONS.md`.
-
----
-
-## 📦 Project Structure
-
-```
-PhyAgentOS/
-│
-├── PhyAgentOS/agent/          # Track A  ─  Planner / Critic / Memory
-│
-├── PhyAgentOS/runtime/        # Track B  ─  Execution Plane
-│   ├── watchdog/              #   WatchdogSupervisor
-│   ├── sessions/              #   SessionRunner / TargetSessionHandle
-│   ├── targets/               #   RolloutTarget (debug·sim·real)
-│   │   └── remote/libero/     #   LIBERO benchmark TargetWS server + proxy
-│   ├── skillruntime/          #   PolicySkillRuntime / BuiltinSkillRuntime
-│   ├── adapters/              #   TargetAdapter / PolicyAdapter / Bridge
-│   │   ├── libero/            #   LIBERO target adapter
-│   │   └── openpi/            #   OpenPI policy adapters
-│   ├── policy/openpi/         #   OpenPI client + LeRobot pi0-family server
-│   ├── perception/            #   Perception Runtime / EnvironmentWriter
-│   ├── preflight/             #   RuntimeCompatibilityPreflight
-│   └── schemas/               #   Pydantic Schema
-│
-├── configs/runtime/           # Sensor / Perception / Contract YAML
-├── scripts/                   # Utility scripts
-├── workspace/                 # Agent workspace; runtime files may share it by config
-├── docs/                      # Documentation
-└── tests/                     # Tests
-```
-
----
-
-## 🏷️ Supported Targets
-
-| | Kind | Location | Examples |
-|:--|:-----|:-----|:-----|
-| 🐛 | `debug` | Local | echo / mock / dry-run — zero-hardware protocol pipeline validation |
-| 🧪 | `simulation` | Remote | RoboCasa, LIBERO — benchmark evaluation & batch experience mining |
-| 🤖 | `real_robot` | Remote | Franka, Go2, XLeRobot, AgileX PIPER — real-world deployment |
-
-> All targets are registered in `TARGETS.md`, identified by `target_adapter://` URI.
-> More examples & demos → [Project Website](https://phy-agent-os.net/)
-
----
-
-## 📖 Documentation
-
-| Document | Audience | Description |
-|:-----|:-----|:-----|
-| [🌐 Website](https://phy-agent-os.net/docs/en/architecture.html) | Everyone | Full docs, architecture details, demos |
-| [📘 User Manual](https://phy-agent-os.net/docs/en/api-reference.html) | Users | Installation, deployment, and operation guide |
-| [📙 Dev Guide](https://phy-agent-os.net/docs/en/developer-guide.html) | Developers | Secondary development, hardware integration, plugin authoring |
-
----
-
-## 🤝 Contributing
-
-PRs and Issues are welcome! Check our development roadmap here → [Dev Plan](https://phy-agent-os.net/docs/en/developer-guide.html).
-
----
-
-<div align="center">
-
-Built on **[nanobot](https://github.com/HKUDS/nanobot)**
-
-Jointly developed by **Sun Yat-sen University HCP Lab** & **Peng Cheng Laboratory**
-
-<br>
-
-<img src="docs/imgs/SYSU.png" alt="SYSU" height="128">
-&nbsp;&nbsp;&nbsp;
-<img src="docs/imgs/Pengcheng.png" alt="Pengcheng" height="128">
-&nbsp;&nbsp;&nbsp;
-<img src="docs/imgs/HCP.jpg" alt="HCP" height="128">
-
-<br>
-<sub>MIT License · Copyright © 2025-2026 PhyAgentOS</sub>
-
-</div>
+MIT. See [LICENSE](LICENSE).

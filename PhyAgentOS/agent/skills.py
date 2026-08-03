@@ -22,17 +22,10 @@ class SkillsLoader:
         self,
         workspace: Path,
         builtin_skills_dir: Path | None = None,
-        *,
-        runtime_workspace: Path | None = None,
-        runtime_enabled: bool = True,
-        runtime_target_enabled: dict[str, bool] | None = None,
     ):
         self.workspace = workspace
-        self.runtime_workspace = runtime_workspace or workspace
         self.workspace_skills = workspace / "skills"
         self.builtin_skills = builtin_skills_dir or BUILTIN_SKILLS_DIR
-        self.runtime_enabled = runtime_enabled
-        self.runtime_target_enabled = dict(runtime_target_enabled or {})
 
     def list_skills(self, filter_unavailable: bool = True) -> list[dict[str, str]]:
         """
@@ -162,11 +155,6 @@ class SkillsLoader:
         for env in requires.get("env", []):
             if not os.environ.get(env):
                 missing.append(f"ENV: {env}")
-        runtime_req = requires.get("runtime")
-        if isinstance(runtime_req, dict):
-            missing_runtime = self._get_missing_runtime_requirement(runtime_req)
-            if missing_runtime:
-                missing.append(f"Runtime: {missing_runtime}")
         return ", ".join(missing)
 
     def _get_skill_description(self, name: str) -> str:
@@ -184,7 +172,7 @@ class SkillsLoader:
                 return content[match.end():].strip()
         return content
 
-    def _parse_PhyAgentOS_metadata(self, raw: str) -> dict:
+    def _parse_paos_metadata(self, raw: str) -> dict:
         """Parse skill metadata JSON from frontmatter (supports PhyAgentOS and openclaw keys)."""
         try:
             data = json.loads(raw)
@@ -203,73 +191,7 @@ class SkillsLoader:
         for env in requires.get("env", []):
             if not os.environ.get(env):
                 return False
-        runtime_req = requires.get("runtime")
-        if isinstance(runtime_req, dict) and not self._check_runtime_requirement(runtime_req):
-            return False
         return True
-
-    def _check_runtime_requirement(self, requirement: dict) -> bool:
-        """Check workspace runtime requirements for agent skill visibility."""
-        return self._get_missing_runtime_requirement(requirement) == ""
-
-    def _get_missing_runtime_requirement(self, requirement: dict) -> str:
-        """Return an empty string when the runtime requirement is satisfied."""
-        if requirement.get("enabled") is True and not self.runtime_enabled:
-            return "runtime disabled"
-
-        target_kind = requirement.get("target_kind")
-        skillruntime_kind = requirement.get("skillruntime_kind")
-        if not target_kind and not skillruntime_kind:
-            return ""
-
-        try:
-            from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block
-
-            targets_doc = read_yaml_block(self.runtime_workspace / "TARGETS.md")
-            skillruntimes_doc = read_yaml_block(self.runtime_workspace / "SKILLRUNTIME.md")
-        except Exception:
-            return "TARGETS.md or SKILLRUNTIME.md missing or invalid"
-
-        targets = targets_doc.get("targets")
-        skillruntimes = skillruntimes_doc.get("skillruntimes")
-        if not isinstance(targets, list) or not isinstance(skillruntimes, list):
-            return "TARGETS.md or SKILLRUNTIME.md missing runtime lists"
-
-        skillruntime_ids = {
-            skillruntime.get("id")
-            for skillruntime in skillruntimes
-            if isinstance(skillruntime, dict)
-            and isinstance(skillruntime.get("id"), str)
-            and (not skillruntime_kind or skillruntime.get("runtime_kind") == skillruntime_kind)
-        }
-        if skillruntime_kind and not skillruntime_ids:
-            return f"no skillruntime with runtime_kind={skillruntime_kind}"
-
-        for target in targets:
-            if not isinstance(target, dict):
-                continue
-            target_id = target.get("id")
-            if not isinstance(target_id, str):
-                continue
-            enabled = bool(target.get("enabled", True))
-            if target_id in self.runtime_target_enabled:
-                enabled = bool(self.runtime_target_enabled[target_id])
-            if not enabled:
-                continue
-            if target_kind and target.get("target_kind") != target_kind:
-                continue
-            supported = target.get("supported_skillruntimes")
-            if not isinstance(supported, list):
-                supported = []
-            if not skillruntime_kind or any(item in skillruntime_ids for item in supported):
-                return ""
-
-        parts = []
-        if target_kind:
-            parts.append(f"enabled target_kind={target_kind}")
-        if skillruntime_kind:
-            parts.append(f"supported runtime_kind={skillruntime_kind}")
-        return "no " + " with ".join(parts)
 
     @staticmethod
     def _metadata_available(skill_meta: dict) -> bool:
@@ -282,14 +204,14 @@ class SkillsLoader:
     def _get_skill_meta(self, name: str) -> dict:
         """Get PhyAgentOS metadata for a skill (cached in frontmatter)."""
         meta = self.get_skill_metadata(name) or {}
-        return self._parse_PhyAgentOS_metadata(meta.get("metadata", ""))
+        return self._parse_paos_metadata(meta.get("metadata", ""))
 
     def get_always_skills(self) -> list[str]:
         """Get skills marked as always=true that meet requirements."""
         result = []
         for s in self.list_skills(filter_unavailable=True):
             meta = self.get_skill_metadata(s["name"]) or {}
-            skill_meta = self._parse_PhyAgentOS_metadata(meta.get("metadata", ""))
+            skill_meta = self._parse_paos_metadata(meta.get("metadata", ""))
             if skill_meta.get("always") or meta.get("always"):
                 result.append(s["name"])
         return result

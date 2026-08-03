@@ -41,7 +41,6 @@ app = typer.Typer(
 
 console = Console()
 EXIT_COMMANDS = {"exit", "quit", "/exit", "/quit", ":q"}
-RUNTIME_PROTOCOL_TEMPLATE_FILES = {"TARGETS.md", "SKILLRUNTIME.md", "SESSIONS.md"}
 
 # ---------------------------------------------------------------------------
 # CLI input: prompt_toolkit for editing, paste, history, and display
@@ -204,7 +203,7 @@ def onboard():
         if not shared_workspace.exists():
             shared_workspace.mkdir(parents=True, exist_ok=True)
             console.print(f"[green]✓[/green] Created shared workspace at {shared_workspace}")
-        created = registry.sync_layout()
+        registry.sync_layout()
         for instance in registry.instances(enabled_only=True):
             if instance.workspace.exists():
                 console.print(f"[green]✓[/green] Ready robot workspace {instance.robot_id} at {instance.workspace}")
@@ -213,7 +212,7 @@ def onboard():
         if not workspace.exists():
             workspace.mkdir(parents=True, exist_ok=True)
             console.print(f"[green]✓[/green] Created workspace at {workspace}")
-        sync_workspace_templates(workspace, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
+        sync_workspace_templates(workspace)
 
     console.print(f"\n{__logo__} PhyAgentOS is ready!")
     console.print("\nNext steps:")
@@ -281,11 +280,11 @@ def _make_provider(config: Config):
     return provider
 
 
-def _make_session_verifier(config: Config, provider):
-    """Create the Agent-owned verifier and its serializable child provider config."""
-    if not config.runtime.enabled or not config.agents.verification.service_enabled:
+def _make_forge_verifier(config: Config, provider):
+    """Create the Forge task verifier and its serializable child provider config."""
+    if not config.forge.enabled or not config.agents.verification.service_enabled:
         return None
-    from PhyAgentOS.agent.session_verifier import SessionVerifier
+    from PhyAgentOS.agent.session_verifier import ForgeTaskVerifier
 
     settings = config.agents.verification
     model = settings.model or config.agents.defaults.model
@@ -312,22 +311,35 @@ def _make_session_verifier(config: Config, provider):
         "max_tokens": min(4096, config.agents.defaults.max_tokens),
         "reasoning_effort": config.agents.defaults.reasoning_effort,
     }
-    return SessionVerifier(
-        workspace=config.runtime_workspace_path,
+    return ForgeTaskVerifier(
+        workspace=config.workspace_path,
         provider=provider,
         model=model,
-        max_replans=settings.max_replans_per_episode,
         evidence_retention=settings.evidence_retention,
         timeout_s=settings.timeout_s,
         service_host=settings.service_host,
         service_port=settings.service_port,
         service_provider_spec=provider_spec,
-        replan_timeout_s=settings.replan_timeout_s,
         max_calls=settings.max_verifier_calls_per_run,
     )
 
 
-def _load_runtime_config(config: str | None = None, workspace: str | None = None) -> Config:
+def _make_forge_orchestrator(config: Config, provider, bus):
+    if not config.forge.enabled:
+        return None
+    from PhyAgentOS.forge.orchestrator import ForgeSessionOrchestrator
+
+    return ForgeSessionOrchestrator(
+        workspace=config.workspace_path,
+        config=config.forge,
+        verifier=_make_forge_verifier(config, provider),
+        bus=bus,
+        max_replans=config.agents.verification.max_replans_per_episode,
+        replan_timeout_s=config.agents.verification.replan_timeout_s,
+    )
+
+
+def _load_command_config(config: str | None = None, workspace: str | None = None) -> Config:
     """Load config and optionally override the active workspace."""
     from PhyAgentOS.config.loader import load_config, set_config_path
 
@@ -359,28 +371,6 @@ def _print_deprecated_memory_window_notice(config: Config) -> None:
         )
 
 
-def _start_runtime_workspace_manager(config: Config):
-    """Provision runtime workspace and start the session watchdog when enabled."""
-    from PhyAgentOS.runtime.workspace import RuntimeWorkspaceManager
-
-    manager = RuntimeWorkspaceManager(config)
-    report = manager.start_watchdog()
-    if config.runtime.enabled:
-        console.print(f"[green]✓[/green] Runtime workspace: {report.workspace}")
-        if report.created:
-            console.print(f"  [dim]Created runtime files: {', '.join(report.created)}[/dim]")
-        if report.updated:
-            console.print(f"  [dim]Updated runtime files: {', '.join(report.updated)}[/dim]")
-        if report.enabled_targets or report.disabled_targets:
-            console.print(
-                "  [dim]Target enable overrides: "
-                f"enabled={report.enabled_targets or []}, disabled={report.disabled_targets or []}[/dim]"
-            )
-        if report.watchdog_started:
-            console.print("[green]✓[/green] Runtime watchdog started")
-    return manager
-
-
 # ============================================================================
 # Gateway / Server
 # ============================================================================
@@ -409,7 +399,7 @@ def gateway(
 
     from PhyAgentOS.embodiment_registry import EmbodimentRegistry
 
-    config = _load_runtime_config(config, workspace)
+    config = _load_command_config(config, workspace)
     _print_deprecated_memory_window_notice(config)
     port = port if port is not None else config.gateway.port
     registry = EmbodimentRegistry(config)
@@ -418,19 +408,10 @@ def gateway(
     if registry.is_fleet:
         registry.sync_layout()
     else:
-        sync_workspace_templates(config.workspace_path, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
-    runtime_manager = _start_runtime_workspace_manager(config)
+        sync_workspace_templates(config.workspace_path)
     bus = MessageBus()
     provider = _make_provider(config)
-    session_verifier = _make_session_verifier(config, provider)
-    recovery_coordinator = None
-    if session_verifier is not None:
-        from PhyAgentOS.agent.recovery_coordinator import AgentRecoveryCoordinator
-
-        recovery_coordinator = AgentRecoveryCoordinator(
-            workspace=config.runtime_workspace_path,
-            bus=bus,
-        )
+    forge_orchestrator = _make_forge_orchestrator(config, provider, bus)
     session_manager = SessionManager(config.workspace_path)
 
     # Create cron service first (callback set after agent creation)
@@ -454,10 +435,7 @@ def gateway(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         embodiment_registry=registry,
-        runtime_workspace=config.runtime_workspace_path,
-        runtime_enabled=config.runtime.enabled,
-        runtime_target_enabled=config.runtime.target_enabled,
-        session_verifier=session_verifier,
+        forge_orchestrator=forge_orchestrator,
     )
 
     # Set cron callback (needs agent)
@@ -570,14 +548,14 @@ def gateway(
         try:
             await cron.start()
             await heartbeat.start()
+            if forge_orchestrator is not None:
+                await forge_orchestrator.start()
             services = [
                 agent.run(),
                 channels.start_all(),
             ]
-            if session_verifier is not None:
-                services.append(session_verifier.run())
-            if recovery_coordinator is not None:
-                services.append(recovery_coordinator.run())
+            if forge_orchestrator is not None:
+                services.append(forge_orchestrator.run())
             await asyncio.gather(*services)
         except KeyboardInterrupt:
             console.print("\nShutting down...")
@@ -586,11 +564,8 @@ def gateway(
             heartbeat.stop()
             cron.stop()
             agent.stop()
-            if recovery_coordinator is not None:
-                recovery_coordinator.stop()
-            if session_verifier is not None:
-                session_verifier.stop()
-            runtime_manager.stop_watchdog()
+            if forge_orchestrator is not None:
+                await forge_orchestrator.stop()
             await channels.stop_all()
 
     asyncio.run(run())
@@ -610,7 +585,7 @@ def agent(
     workspace: str | None = typer.Option(None, "--workspace", "-w", help="Workspace directory"),
     config: str | None = typer.Option(None, "--config", "-c", help="Config file path"),
     markdown: bool = typer.Option(True, "--markdown/--no-markdown", help="Render assistant output as Markdown"),
-    logs: bool = typer.Option(False, "--logs/--no-logs", help="Show PhyAgentOS runtime logs during chat"),
+    logs: bool = typer.Option(False, "--logs/--no-logs", help="Show PhyAgentOS process logs during chat"),
 ):
     """Interact with the agent directly."""
     from loguru import logger
@@ -621,26 +596,17 @@ def agent(
     from PhyAgentOS.cron.service import CronService
     from PhyAgentOS.embodiment_registry import EmbodimentRegistry
 
-    config = _load_runtime_config(config, workspace)
+    config = _load_command_config(config, workspace)
     _print_deprecated_memory_window_notice(config)
     registry = EmbodimentRegistry(config)
     if registry.is_fleet:
         registry.sync_layout()
     else:
-        sync_workspace_templates(config.workspace_path, exclude=RUNTIME_PROTOCOL_TEMPLATE_FILES)
-    runtime_manager = _start_runtime_workspace_manager(config)
+        sync_workspace_templates(config.workspace_path)
 
     bus = MessageBus()
     provider = _make_provider(config)
-    session_verifier = _make_session_verifier(config, provider)
-    recovery_coordinator = None
-    if session_verifier is not None:
-        from PhyAgentOS.agent.recovery_coordinator import AgentRecoveryCoordinator
-
-        recovery_coordinator = AgentRecoveryCoordinator(
-            workspace=config.runtime_workspace_path,
-            bus=bus,
-        )
+    forge_orchestrator = _make_forge_orchestrator(config, provider, bus)
 
     # Create cron service for tool usage (no callback needed for CLI unless running)
     cron_store_path = get_cron_dir() / "jobs.json"
@@ -666,10 +632,7 @@ def agent(
         mcp_servers=config.tools.mcp_servers,
         channels_config=config.channels,
         embodiment_registry=registry,
-        runtime_workspace=config.runtime_workspace_path,
-        runtime_enabled=config.runtime.enabled,
-        runtime_target_enabled=config.runtime.target_enabled,
-        session_verifier=session_verifier,
+        forge_orchestrator=forge_orchestrator,
     )
 
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -691,22 +654,45 @@ def agent(
     if message:
         # Single message mode — direct call, no bus needed
         async def run_once():
-            verifier_task = (
-                asyncio.create_task(session_verifier.run())
-                if session_verifier is not None
-                else None
-            )
+            agent_task = None
+            orchestrator_task = None
             try:
+                if forge_orchestrator is not None:
+                    await forge_orchestrator.start()
+                    orchestrator_task = asyncio.create_task(forge_orchestrator.run())
                 with _thinking_ctx():
                     response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
                 _print_agent_response(response, render_markdown=markdown)
+                if forge_orchestrator is not None and forge_orchestrator.store.nonterminal():
+                    agent_task = asyncio.create_task(agent_loop.run())
+                    while forge_orchestrator.store.nonterminal():
+                        try:
+                            outbound = await asyncio.wait_for(
+                                bus.consume_outbound(), timeout=0.25
+                            )
+                            if outbound.content:
+                                _print_agent_response(
+                                    outbound.content, render_markdown=markdown
+                                )
+                        except asyncio.TimeoutError:
+                            pass
+                    try:
+                        outbound = await asyncio.wait_for(bus.consume_outbound(), timeout=5.0)
+                        if outbound.content:
+                            _print_agent_response(outbound.content, render_markdown=markdown)
+                    except asyncio.TimeoutError:
+                        pass
             finally:
-                if session_verifier is not None:
-                    session_verifier.stop()
-                if verifier_task is not None:
-                    verifier_task.cancel()
-                    await asyncio.gather(verifier_task, return_exceptions=True)
-                runtime_manager.stop_watchdog()
+                agent_loop.stop()
+                if forge_orchestrator is not None:
+                    await forge_orchestrator.stop()
+                for task in (agent_task, orchestrator_task):
+                    if task is not None:
+                        task.cancel()
+                await asyncio.gather(
+                    *[task for task in (agent_task, orchestrator_task) if task is not None],
+                    return_exceptions=True,
+                )
                 await agent_loop.close_mcp()
 
         asyncio.run(run_once())
@@ -738,15 +724,12 @@ def agent(
             signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
         async def run_interactive():
+            if forge_orchestrator is not None:
+                await forge_orchestrator.start()
             bus_task = asyncio.create_task(agent_loop.run())
-            verifier_task = (
-                asyncio.create_task(session_verifier.run())
-                if session_verifier is not None
-                else None
-            )
-            recovery_task = (
-                asyncio.create_task(recovery_coordinator.run())
-                if recovery_coordinator is not None
+            orchestrator_task = (
+                asyncio.create_task(forge_orchestrator.run())
+                if forge_orchestrator is not None
                 else None
             )
             turn_done = asyncio.Event()
@@ -819,19 +802,16 @@ def agent(
                         break
             finally:
                 agent_loop.stop()
-                if recovery_coordinator is not None:
-                    recovery_coordinator.stop()
-                if session_verifier is not None:
-                    session_verifier.stop()
-                runtime_manager.stop_watchdog()
+                if forge_orchestrator is not None:
+                    await forge_orchestrator.stop()
                 outbound_task.cancel()
-                for task in (verifier_task, recovery_task):
+                for task in (orchestrator_task,):
                     if task is not None:
                         task.cancel()
                 await asyncio.gather(
                     *[
                         task
-                        for task in (bus_task, outbound_task, verifier_task, recovery_task)
+                        for task in (bus_task, outbound_task, orchestrator_task)
                         if task is not None
                     ],
                     return_exceptions=True,
@@ -944,7 +924,7 @@ def channels_login():
     import subprocess
 
     from PhyAgentOS.config.loader import load_config
-    from PhyAgentOS.config.paths import get_runtime_subdir
+    from PhyAgentOS.config.paths import get_data_subdir
 
     config = load_config()
     bridge_dir = _get_bridge_dir()
@@ -955,7 +935,7 @@ def channels_login():
     env = {**os.environ}
     if config.channels.whatsapp.bridge_token:
         env["BRIDGE_TOKEN"] = config.channels.whatsapp.bridge_token
-    env["AUTH_DIR"] = str(get_runtime_subdir("whatsapp-auth"))
+    env["AUTH_DIR"] = str(get_data_subdir("whatsapp-auth"))
 
     try:
         subprocess.run(["npm", "start"], cwd=bridge_dir, check=True, env=env)

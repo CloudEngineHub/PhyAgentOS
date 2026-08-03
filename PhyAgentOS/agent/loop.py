@@ -9,7 +9,7 @@ import re
 import sys
 from contextlib import AsyncExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from loguru import logger
 
@@ -36,6 +36,7 @@ from PhyAgentOS.session.manager import Session, SessionManager
 if TYPE_CHECKING:
     from PhyAgentOS.config.schema import ChannelsConfig, ExecToolConfig
     from PhyAgentOS.cron.service import CronService
+    from PhyAgentOS.forge.orchestrator import ForgeSessionOrchestrator
 
 
 class AgentLoop:
@@ -69,10 +70,7 @@ class AgentLoop:
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
         embodiment_registry: EmbodimentRegistry | None = None,
-        runtime_workspace: Path | None = None,
-        runtime_enabled: bool = True,
-        runtime_target_enabled: dict[str, bool] | None = None,
-        session_verifier: Any | None = None,
+        forge_orchestrator: ForgeSessionOrchestrator | None = None,
     ):
         from PhyAgentOS.config.schema import ExecToolConfig
         self.bus = bus
@@ -87,14 +85,15 @@ class AgentLoop:
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
-        self.session_verifier = session_verifier
-        self.runtime_workspace = runtime_workspace
+        self.forge_orchestrator = forge_orchestrator
 
         self.context = ContextBuilder(
             workspace,
-            runtime_workspace=runtime_workspace,
-            runtime_enabled=runtime_enabled,
-            runtime_target_enabled=runtime_target_enabled,
+            forge_context_provider=(
+                forge_orchestrator.capabilities_summary
+                if forge_orchestrator is not None
+                else None
+            ),
         )
         self.sessions = session_manager or SessionManager(workspace)
         self.tools = ToolRegistry()
@@ -157,17 +156,27 @@ class AgentLoop:
             self.tools.register(ImageTool(self.provider, send_callback=self.bus.publish_outbound))
 
         self.tools.register(SceneGraphQueryTool(workspace=self.workspace))
-        if self.session_verifier is not None and self.runtime_workspace is not None:
-            from PhyAgentOS.agent.tools.session_replan import CreateReplannedSessionTool
-            from PhyAgentOS.agent.tools.session_verification import VerifySessionTool
-            from PhyAgentOS.runtime.watchdog.registry import SessionRegistry
-
-            self.tools.register(VerifySessionTool(self.session_verifier))
-            self.tools.register(
-                CreateReplannedSessionTool(
-                    SessionRegistry(Path(self.runtime_workspace) / "SESSIONS.md")
-                )
+        if self.forge_orchestrator is not None:
+            from PhyAgentOS.agent.tools.forge import (
+                CreateReplannedForgeSessionTool,
+                ForgeCancelSessionTool,
+                ForgeExecuteTaskTool,
+                ForgeGetContextTool,
+                ForgeGetSessionTool,
+                ForgeResetTool,
+                VerifyForgeSessionTool,
             )
+
+            for tool in (
+                ForgeExecuteTaskTool(self.forge_orchestrator),
+                ForgeGetSessionTool(self.forge_orchestrator),
+                ForgeCancelSessionTool(self.forge_orchestrator),
+                ForgeGetContextTool(self.forge_orchestrator),
+                ForgeResetTool(self.forge_orchestrator),
+                VerifyForgeSessionTool(self.forge_orchestrator),
+                CreateReplannedForgeSessionTool(self.forge_orchestrator),
+            ):
+                self.tools.register(tool)
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -191,12 +200,20 @@ class AgentLoop:
         finally:
             self._mcp_connecting = False
 
-    def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
+    def _set_tool_context(
+        self,
+        channel: str,
+        chat_id: str,
+        message_id: str | None = None,
+        session_key: str | None = None,
+    ) -> None:
         """Update context for all tools that need routing info."""
         for name in ("message", "spawn", "cron"):
             if tool := self.tools.get(name):
                 if hasattr(tool, "set_context"):
                     tool.set_context(channel, chat_id, *([message_id] if name == "message" else []))
+        if tool := self.tools.get("forge_execute_task"):
+            tool.set_context(channel, chat_id, session_key)
 
     @staticmethod
     def _strip_think(text: str | None) -> str | None:
@@ -319,7 +336,15 @@ class AgentLoop:
             except (asyncio.CancelledError, Exception):
                 pass
         sub_cancelled = await self.subagents.cancel_by_session(msg.session_key)
-        total = cancelled + sub_cancelled
+        forge_cancelled = 0
+        if self.forge_orchestrator is not None:
+            for record in self.forge_orchestrator.store.nonterminal():
+                if record.origin_session_key == msg.session_key:
+                    await self.forge_orchestrator.cancel_session(
+                        record.session_id, reason="user_stop"
+                    )
+                    forge_cancelled += 1
+        total = cancelled + sub_cancelled + forge_cancelled
         content = f"Stopped {total} task(s)." if total else "No active task to stop."
         await self.bus.publish_outbound(OutboundMessage(
             channel=msg.channel, chat_id=msg.chat_id, content=content,
@@ -385,10 +410,15 @@ class AgentLoop:
             channel, chat_id = (msg.chat_id.split(":", 1) if ":" in msg.chat_id
                                 else ("cli", msg.chat_id))
             logger.info("Processing system message from {}", msg.sender_id)
-            key = f"{channel}:{chat_id}"
+            key = msg.session_key_override or f"{channel}:{chat_id}"
             session = self.sessions.get_or_create(key)
             await self.memory_consolidator.maybe_consolidate_by_tokens(session)
-            self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
+            self._set_tool_context(
+                channel,
+                chat_id,
+                msg.metadata.get("message_id"),
+                msg.session_key,
+            )
             history = session.get_history(max_messages=0)
             messages = self.context.build_messages(
                 history=history,
@@ -443,7 +473,12 @@ class AgentLoop:
             )
         await self.memory_consolidator.maybe_consolidate_by_tokens(session)
 
-        self._set_tool_context(msg.channel, msg.chat_id, msg.metadata.get("message_id"))
+        self._set_tool_context(
+            msg.channel,
+            msg.chat_id,
+            msg.metadata.get("message_id"),
+            msg.session_key,
+        )
         if message_tool := self.tools.get("message"):
             if isinstance(message_tool, MessageTool):
                 message_tool.start_turn()
@@ -496,8 +531,8 @@ class AgentLoop:
             if role == "tool" and isinstance(content, str) and len(content) > self._TOOL_RESULT_MAX_CHARS:
                 entry["content"] = content[:self._TOOL_RESULT_MAX_CHARS] + "\n... (truncated)"
             elif role == "user":
-                if isinstance(content, str) and content.startswith(ContextBuilder._RUNTIME_CONTEXT_TAG):
-                    # Strip the runtime-context prefix, keep only the user text.
+                if isinstance(content, str) and content.startswith(ContextBuilder._MESSAGE_CONTEXT_TAG):
+                    # Strip the message-metadata prefix, keep only the user text.
                     parts = content.split("\n\n", 1)
                     if len(parts) > 1 and parts[1].strip():
                         entry["content"] = parts[1]
@@ -506,8 +541,8 @@ class AgentLoop:
                 if isinstance(content, list):
                     filtered = []
                     for c in content:
-                        if c.get("type") == "text" and isinstance(c.get("text"), str) and c["text"].startswith(ContextBuilder._RUNTIME_CONTEXT_TAG):
-                            continue  # Strip runtime context from multimodal messages
+                        if c.get("type") == "text" and isinstance(c.get("text"), str) and c["text"].startswith(ContextBuilder._MESSAGE_CONTEXT_TAG):
+                            continue  # Strip message metadata from multimodal messages
                         if (c.get("type") == "image_url"
                                 and c.get("image_url", {}).get("url", "").startswith("data:image/")):
                             filtered.append({"type": "text", "text": "[image]"})
