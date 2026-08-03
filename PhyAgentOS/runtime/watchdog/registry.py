@@ -5,12 +5,19 @@ from __future__ import annotations
 import fcntl
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 from uuid import uuid4
 
 from pydantic import ValidationError
 
-from PhyAgentOS.runtime.schemas import SessionResult, SessionsDocument, SessionSpec, SessionStatus
+from PhyAgentOS.runtime.schemas import (
+    RecoveryRequest,
+    SessionResult,
+    SessionRuntimeHints,
+    SessionsDocument,
+    SessionSpec,
+    SessionStatus,
+)
 from PhyAgentOS.runtime.schemas.common import utc_now
 from PhyAgentOS.runtime.schemas.session import validate_status_transition
 from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block, write_yaml_block
@@ -51,6 +58,32 @@ class SessionRegistry:
             if session.status == SessionStatus.PENDING:
                 return session
         return None
+
+    def first_awaiting_verification(
+        self, document: SessionsDocument | None = None
+    ) -> SessionSpec | None:
+        document = document or self.load()
+        return next(
+            (
+                session
+                for session in document.sessions
+                if session.status == SessionStatus.AWAITING_VERIFICATION
+            ),
+            None,
+        )
+
+    def first_awaiting_replan(
+        self, document: SessionsDocument | None = None
+    ) -> SessionSpec | None:
+        document = document or self.load()
+        return next(
+            (
+                session
+                for session in document.sessions
+                if session.status == SessionStatus.AWAITING_REPLAN
+            ),
+            None,
+        )
 
     def get_session(self, session_id: str) -> SessionSpec:
         for session in self.load().sessions:
@@ -95,6 +128,44 @@ class SessionRegistry:
     def mark_finalizing(self, session_id: str) -> None:
         self._update_session_status(session_id, SessionStatus.FINALIZING)
 
+    def mark_awaiting_verification(self, session_id: str, result: SessionResult) -> None:
+        result.verification.status = "pending"
+        self._update_session_status(
+            session_id,
+            SessionStatus.AWAITING_VERIFICATION,
+            result=result,
+        )
+
+    def try_claim_verification(self, session_id: str, worker_id: str) -> bool:
+        """Atomically claim one semantic verification attempt."""
+        with self._exclusive_lock():
+            document = self._load_unlocked()
+            session = self._get_session_from_document(document, session_id)
+            if session.status != SessionStatus.AWAITING_VERIFICATION:
+                return False
+            validate_status_transition(session.status, SessionStatus.VERIFYING)
+            session.status = SessionStatus.VERIFYING
+            session.claimed_by = worker_id
+            session.claim_token = uuid4().hex
+            session.updated_at = utc_now()
+            session.result.verification.status = "running"
+            self._save_unlocked(document)
+            return True
+
+    def release_verification(self, session_id: str, worker_id: str) -> None:
+        with self._exclusive_lock():
+            document = self._load_unlocked()
+            session = self._get_session_from_document(document, session_id)
+            if session.status != SessionStatus.VERIFYING or session.claimed_by != worker_id:
+                return
+            validate_status_transition(session.status, SessionStatus.AWAITING_VERIFICATION)
+            session.status = SessionStatus.AWAITING_VERIFICATION
+            session.claimed_by = None
+            session.claim_token = None
+            session.updated_at = utc_now()
+            session.result.verification.status = "pending"
+            self._save_unlocked(document)
+
     def mark_preflight_checking(self, session_id: str) -> None:
         self._update_session_status(session_id, SessionStatus.PREFLIGHT_CHECKING)
 
@@ -136,6 +207,167 @@ class SessionRegistry:
         status = SessionStatus(result.status or (SessionStatus.SUCCEEDED.value if result.success else SessionStatus.FAILED.value))
         self._update_session_status(session_id, status, result=result)
 
+    def mark_verification_finished(
+        self,
+        session_id: str,
+        result: SessionResult,
+        final_status: SessionStatus,
+    ) -> None:
+        if final_status not in {
+            SessionStatus.SUCCEEDED,
+            SessionStatus.FAILED,
+            SessionStatus.TIMED_OUT,
+            SessionStatus.CANCELLED,
+        }:
+            raise ValueError(f"invalid post-verification terminal status: {final_status}")
+        result.status = final_status.value
+        result.success = final_status == SessionStatus.SUCCEEDED
+        result.verification.status = (
+            "error" if result.verification.error else "completed"
+        )
+        self._update_session_status(session_id, final_status, result=result)
+
+    def mark_awaiting_replan(
+        self,
+        session_id: str,
+        result: SessionResult,
+        request: RecoveryRequest,
+    ) -> None:
+        result.status = SessionStatus.AWAITING_REPLAN.value
+        result.success = False
+        result.verification.status = "completed"
+        result.metadata["recovery_request"] = request.model_dump(mode="json")
+        self._update_session_status(
+            session_id,
+            SessionStatus.AWAITING_REPLAN,
+            result=result,
+        )
+
+    def mark_recovery_dispatched(self, session_id: str) -> RecoveryRequest:
+        with self._exclusive_lock():
+            document = self._load_unlocked()
+            session = self._get_session_from_document(document, session_id)
+            if session.status != SessionStatus.AWAITING_REPLAN:
+                raise ValueError("session is not awaiting replan")
+            raw = session.result.metadata.get("recovery_request")
+            request = RecoveryRequest.model_validate(raw)
+            if request.dispatched_at is None:
+                request.dispatched_at = utc_now()
+                session.result.metadata["recovery_request"] = request.model_dump(mode="json")
+                session.updated_at = utc_now()
+                self._save_unlocked(document)
+            return request
+
+    def create_replanned_session(
+        self,
+        parent_session_id: str,
+        *,
+        task_description: str,
+        runtime_hints: dict[str, Any],
+    ) -> SessionSpec:
+        """Atomically append a freshly planned child and finish its parent attempt."""
+        description = task_description.strip()
+        if not description:
+            raise ValueError("replanned task_description must be non-empty")
+        required_hint_fields = {
+            "perception_queries",
+            "force_environment_refresh",
+            "preferred_replan_every_steps",
+            "gateway_action",
+        }
+        missing_hint_fields = required_hint_fields - set(runtime_hints)
+        if missing_hint_fields:
+            raise ValueError(
+                "replanned runtime_hints must be complete; missing: "
+                + ", ".join(sorted(missing_hint_fields))
+            )
+        hints = SessionRuntimeHints.model_validate(runtime_hints)
+        gateway_action = dict(hints.gateway_action)
+        gateway_action.pop("command_id", None)
+        hints.gateway_action = gateway_action
+
+        with self._exclusive_lock():
+            document = self._load_unlocked()
+            parent = self._get_session_from_document(document, parent_session_id)
+            if parent.status != SessionStatus.AWAITING_REPLAN:
+                raise ValueError("parent session is not awaiting replan")
+            recovery = RecoveryRequest.model_validate(
+                parent.result.metadata.get("recovery_request")
+            )
+            if utc_now() >= recovery.deadline:
+                raise ValueError("recovery request deadline has expired")
+            attempt = parent.replan_attempt + 1
+            child_id = f"{parent.session_id}_replan_{attempt}_{uuid4().hex[:6]}"
+            child = SessionSpec(
+                session_id=child_id,
+                parent_session_id=parent.session_id,
+                replan_attempt=attempt,
+                goal_id=parent.goal_id,
+                parent_goal_id=parent.parent_goal_id,
+                horizon=parent.horizon,
+                target_ref=parent.target_ref,
+                skillruntime_ref=parent.skillruntime_ref,
+                task_description=description,
+                verification=parent.verification.model_copy(deep=True),
+                status=SessionStatus.PENDING,
+                priority=parent.priority,
+                created_at=utc_now(),
+                updated_at=utc_now(),
+                timeouts=parent.timeouts.model_copy(deep=True),
+                retry=parent.retry.model_copy(update={"attempted": 0}, deep=True),
+                depends_on=[],
+                routing=parent.routing.model_copy(deep=True),
+                execution=parent.execution.model_copy(deep=True),
+                runtime_hints=hints,
+                safety_profile=parent.safety_profile.model_copy(deep=True),
+                result=SessionResult(),
+            )
+            if any(item.session_id == child.session_id for item in document.sessions):
+                raise ValueError(f"duplicate replanned session id: {child.session_id}")
+            validate_status_transition(parent.status, SessionStatus.REPLANNED)
+            parent.status = SessionStatus.REPLANNED
+            parent.updated_at = utc_now()
+            parent.result.status = SessionStatus.REPLANNED.value
+            parent.result.success = False
+            parent.result.metadata["replanned_session_id"] = child.session_id
+            document.sessions.append(child)
+            self._save_unlocked(document)
+            return child
+
+    def mark_replan_failed(
+        self,
+        session_id: str,
+        *,
+        error_code: str,
+        error_message: str,
+    ) -> bool:
+        with self._exclusive_lock():
+            document = self._load_unlocked()
+            session = self._get_session_from_document(document, session_id)
+            if session.status != SessionStatus.AWAITING_REPLAN:
+                return False
+            validate_status_transition(session.status, SessionStatus.FAILED)
+            result = session.result.model_copy(deep=True)
+            result.status = SessionStatus.FAILED.value
+            result.success = False
+            result.error_code = error_code
+            result.error_message = error_message
+            session.status = SessionStatus.FAILED
+            session.claimed_by = None
+            session.claim_token = None
+            session.updated_at = utc_now()
+            session.result = result
+            self._save_unlocked(document)
+            return True
+
+    def update_result(self, session_id: str, result: SessionResult) -> None:
+        with self._exclusive_lock():
+            document = self._load_unlocked()
+            session = self._get_session_from_document(document, session_id)
+            session.result = result
+            session.updated_at = utc_now()
+            self._save_unlocked(document)
+
     def mark_retry_pending(self, session_id: str, error: Exception) -> None:
         """Return a claimed/running session to pending for a configured retry."""
         with self._exclusive_lock():
@@ -171,6 +403,12 @@ class SessionRegistry:
                     continue
                 validate_status_transition(session.status, status)
                 session.status = status
+                if status not in {
+                    SessionStatus.CLAIMED,
+                    SessionStatus.VERIFYING,
+                }:
+                    session.claimed_by = None
+                    session.claim_token = None
                 session.updated_at = utc_now()
                 if result is not None:
                     session.result = result

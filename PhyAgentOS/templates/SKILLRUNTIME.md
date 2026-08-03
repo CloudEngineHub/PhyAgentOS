@@ -98,9 +98,8 @@ skillruntimes:
       - simulation
       - real_robot
     observation_contract:
-      observation_type: empty
-      empty_observation_allowed: true
-      empty_observation_semantics: gateway_runtime_context
+      observation_type: multimodal
+      empty_observation_allowed: false
     supports_chunk: false
     default_replan_every: 1
     requires:
@@ -116,4 +115,8 @@ skillruntimes:
     output_contract:
       gateway_result:
         status_source: /agent/sessions/{session_id}
+        command_identity: policy_command_status.request_id == command_id
+        execution_record: runtime_execution_record_v1
+        evidence_bundle: forge_evidence_bundle_v1
+        evidence_association: best_effort
 ```

@@ -14,9 +14,9 @@ from PhyAgentOS.runtime.state_io.markdown_yaml import read_yaml_block
 class ForgeGatewayCommandAdapter:
     """Small Agent-facing adapter for commands that are not action sessions.
 
-    Phase-3 PAOS action execution still uses SESSIONS.md and GatewaySessionRunner.
-    Runtime-level commands such as scene reset should use this adapter so they do
-    not get misrepresented as `/agent/sessions` actions.
+    Action execution uses SESSIONS.md and the verification-aware ForgeAdapter.
+    Runtime-level commands such as scene reset use this separate adapter so they
+    are not misrepresented as `/agent/sessions` task actions.
     """
 
     def __init__(self, client: ForgeGatewayClient):

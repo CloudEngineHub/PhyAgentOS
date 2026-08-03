@@ -6,9 +6,10 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from PhyAgentOS.runtime.schemas.result import SessionResult
+from PhyAgentOS.runtime.schemas.verification import TaskVerificationContract
 
 
 class SessionStatus(StrEnum):
@@ -17,8 +18,12 @@ class SessionStatus(StrEnum):
     PREFLIGHT_CHECKING = "preflight_checking"
     RUNNING = "running"
     FINALIZING = "finalizing"
+    AWAITING_VERIFICATION = "awaiting_verification"
+    VERIFYING = "verifying"
+    AWAITING_REPLAN = "awaiting_replan"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    REPLANNED = "replanned"
     TIMED_OUT = "timed_out"
     CANCELLING = "cancelling"
     CANCELLED = "cancelled"
@@ -28,6 +33,7 @@ class SessionStatus(StrEnum):
 TERMINAL_SESSION_STATUSES = {
     SessionStatus.SUCCEEDED,
     SessionStatus.FAILED,
+    SessionStatus.REPLANNED,
     SessionStatus.TIMED_OUT,
     SessionStatus.CANCELLED,
     SessionStatus.REJECTED,
@@ -45,10 +51,24 @@ ALLOWED_STATUS_TRANSITIONS: dict[SessionStatus, set[SessionStatus]] = {
         SessionStatus.CANCELLING,
     },
     SessionStatus.FINALIZING: {
+        SessionStatus.AWAITING_VERIFICATION,
         SessionStatus.SUCCEEDED,
         SessionStatus.FAILED,
         SessionStatus.TIMED_OUT,
         SessionStatus.CANCELLED,
+    },
+    SessionStatus.AWAITING_VERIFICATION: {SessionStatus.VERIFYING},
+    SessionStatus.VERIFYING: {
+        SessionStatus.AWAITING_VERIFICATION,
+        SessionStatus.AWAITING_REPLAN,
+        SessionStatus.SUCCEEDED,
+        SessionStatus.FAILED,
+        SessionStatus.TIMED_OUT,
+        SessionStatus.CANCELLED,
+    },
+    SessionStatus.AWAITING_REPLAN: {
+        SessionStatus.REPLANNED,
+        SessionStatus.FAILED,
     },
     SessionStatus.CANCELLING: {SessionStatus.CANCELLED, SessionStatus.FAILED},
 }
@@ -110,13 +130,22 @@ class SessionSafetyProfile(BaseModel):
 
 
 class SessionSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     session_id: str
+    parent_session_id: str | None = None
+    replan_attempt: int = Field(default=0, ge=0)
     goal_id: str | None = None
     parent_goal_id: str | None = None
     horizon: Literal["short_term", "long_term"] | None = None
     target_ref: str
     skillruntime_ref: str
     task_description: str
+    verification: TaskVerificationContract = Field(default_factory=TaskVerificationContract)
+    verification_profile: Literal["strict", "audit", "recovery"] | None = Field(
+        default=None,
+        exclude=True,
+    )
     status: SessionStatus = SessionStatus.PENDING
     priority: Literal["low", "normal", "high"] = "normal"
     created_at: datetime | None = None
@@ -131,6 +160,34 @@ class SessionSpec(BaseModel):
     runtime_hints: SessionRuntimeHints = Field(default_factory=SessionRuntimeHints)
     safety_profile: SessionSafetyProfile = Field(default_factory=SessionSafetyProfile)
     result: SessionResult = Field(default_factory=SessionResult)
+
+    @field_validator("session_id")
+    @classmethod
+    def validate_session_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized or normalized in {".", ".."} or "/" in normalized or "\\" in normalized:
+            raise ValueError("session_id must be a non-empty path-safe identifier")
+        return normalized
+
+    @model_validator(mode="after")
+    def migrate_legacy_verification_profile(self) -> "SessionSpec":
+        legacy = self.verification_profile
+        if legacy is None:
+            return self
+        if "verification" in self.model_fields_set:
+            raise ValueError("use verification or verification_profile, not both")
+        mode = {"strict": "off", "audit": "audit", "recovery": "recovery"}[legacy]
+        if mode == "off":
+            self.verification = TaskVerificationContract(mode="off", contract_origin="legacy")
+        else:
+            task = self.task_description.strip()
+            self.verification = TaskVerificationContract(
+                mode=mode,
+                goal=task,
+                success_criteria=[task],
+                contract_origin="legacy",
+            )
+        return self
 
 
 class SessionsDocument(BaseModel):

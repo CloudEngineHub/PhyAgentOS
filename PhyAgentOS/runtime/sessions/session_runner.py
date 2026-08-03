@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from PhyAgentOS.runtime.adapters.factory import build_adapter_stack
 from PhyAgentOS.runtime.perception.config_resolver import ResolvedPerceptionPlan
 from PhyAgentOS.runtime.perception.perception_runtime import PerceptionRuntime
 from PhyAgentOS.runtime.policy.base_client import BasePolicyClient
-from PhyAgentOS.runtime.schemas import AdapterPlan, SessionResult, SessionSpec, SkillRuntimeSpec, TargetSpec, TargetToolManifest
+from PhyAgentOS.runtime.schemas import (
+    AdapterPlan,
+    SessionResult,
+    SessionSpec,
+    SkillRuntimeSpec,
+    TargetSpec,
+    TargetToolManifest,
+)
 from PhyAgentOS.runtime.sessions.models import SessionState, SkillContext, SkillRuntimeResult
 from PhyAgentOS.runtime.sessions.target_session_handle import TargetSessionHandle
 from PhyAgentOS.runtime.skillruntime.builtin import BuiltinSkillRuntime
@@ -43,6 +51,9 @@ class SessionRunner:
         self.perception_plan = perception_plan
         self.target_tool_manifest = target_tool_manifest
         self.state = SessionState(session_id=session.session_id, trace_id=f"trace_{uuid4().hex[:12]}")
+        self._initial_observation: dict | None = None
+        self._initial_observed_at: datetime | None = None
+        self._final_observed_at: datetime | None = None
 
     def start(self) -> SessionResult:
         self.state.started_at_ns = time.time_ns()
@@ -56,6 +67,8 @@ class SessionRunner:
         self.target.start_session(session_ctx)
         self.state.heartbeat()
         initial_observation = self.target.reset(self.session.model_dump(mode="json"))
+        self._initial_observation = initial_observation
+        self._initial_observed_at = datetime.now(timezone.utc)
         self.state.heartbeat()
         handle = TargetSessionHandle(
             session=self.session,
@@ -91,6 +104,7 @@ class SessionRunner:
                 raise PolicyProtocolError("registered skill runtime is not a BuiltinSkillRuntime")
             result = self.skill_runtime.run_builtin_loop(skill_ctx, handle, self.adapter_plan)
         self.state.completed_at_ns = time.time_ns()
+        self._final_observed_at = datetime.now(timezone.utc)
         self.state.heartbeat()
         return self._to_session_result(result)
 
@@ -112,6 +126,25 @@ class SessionRunner:
 
     def close(self) -> None:
         self.target.close()
+
+    @property
+    def initial_observation(self) -> dict | None:
+        return self._initial_observation
+
+    @property
+    def final_observation(self) -> dict | None:
+        observation = self.state.last_status.get("obs")
+        return observation if isinstance(observation, dict) else None
+
+    @property
+    def initial_observed_at(self) -> datetime | None:
+        return self._initial_observed_at
+
+    @property
+    def final_observed_at(self) -> datetime | None:
+        if self.final_observation is not None and self._final_observed_at is None:
+            self._final_observed_at = datetime.now(timezone.utc)
+        return self._final_observed_at
 
     def _session_context(self) -> dict:
         return {

@@ -8,7 +8,11 @@ from PhyAgentOS.runtime.schemas.perception import (
     EnvironmentObjectSource,
     PerceptionConfigDocument,
 )
-from PhyAgentOS.runtime.schemas.preflight import MissingItem, RuntimeCompatibilityPreflightResult, TargetToolManifest
+from PhyAgentOS.runtime.schemas.preflight import (
+    MissingItem,
+    RuntimeCompatibilityPreflightResult,
+    TargetToolManifest,
+)
 from PhyAgentOS.runtime.schemas.result import SessionResult
 from PhyAgentOS.runtime.schemas.runtime_contract import (
     ActionChunkSpec,
@@ -32,16 +36,32 @@ from PhyAgentOS.runtime.schemas.skillruntime import (
     SkillObservationContract,
     SkillPolicySpec,
     SkillRequirements,
-    SkillRuntimeSpec,
     SkillRuntimeDocument,
+    SkillRuntimeSpec,
     TargetToolPolicy,
 )
 from PhyAgentOS.runtime.schemas.target import (
     TargetObservationContract,
     TargetPerceptionRefs,
     TargetRuntimeSpec,
-    TargetSpec,
     TargetsDocument,
+    TargetSpec,
+)
+from PhyAgentOS.runtime.schemas.verification import (
+    CriterionVerdict,
+    EvidenceArtifact,
+    EvidenceBundle,
+    EvidenceCaptureWindow,
+    EvidenceQuality,
+    ExecutionError,
+    ExecutionRecord,
+    ExecutionTimeline,
+    RecoveryContext,
+    RecoveryRequest,
+    TaskVerificationContract,
+    VerificationEvidencePolicy,
+    VerificationState,
+    VerificationVerdict,
 )
 
 __all__ = [
@@ -82,4 +102,18 @@ __all__ = [
     "TargetsDocument",
     "SkillObservationContract",
     "SkillPolicySpec",
+    "CriterionVerdict",
+    "EvidenceArtifact",
+    "EvidenceBundle",
+    "EvidenceCaptureWindow",
+    "EvidenceQuality",
+    "ExecutionError",
+    "ExecutionRecord",
+    "ExecutionTimeline",
+    "RecoveryContext",
+    "RecoveryRequest",
+    "TaskVerificationContract",
+    "VerificationEvidencePolicy",
+    "VerificationState",
+    "VerificationVerdict",
 ]

@@ -14,13 +14,12 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 from loguru import logger
 
 from PhyAgentOS.agent.context import ContextBuilder
-from PhyAgentOS.embodiment_registry import EmbodimentRegistry
 from PhyAgentOS.agent.memory import MemoryConsolidator
 from PhyAgentOS.agent.subagent import SubagentManager
-from PhyAgentOS.agent.tools.cron import CronTool
 from PhyAgentOS.agent.tools.agent import AgentModeTool
-from PhyAgentOS.agent.tools.image import ImageTool
+from PhyAgentOS.agent.tools.cron import CronTool
 from PhyAgentOS.agent.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
+from PhyAgentOS.agent.tools.image import ImageTool
 from PhyAgentOS.agent.tools.message import MessageTool
 from PhyAgentOS.agent.tools.registry import ToolRegistry
 from PhyAgentOS.agent.tools.scene_graph import SceneGraphQueryTool
@@ -29,6 +28,7 @@ from PhyAgentOS.agent.tools.spawn import SpawnTool
 from PhyAgentOS.agent.tools.web import WebFetchTool, WebSearchTool
 from PhyAgentOS.bus.events import InboundMessage, OutboundMessage
 from PhyAgentOS.bus.queue import MessageBus
+from PhyAgentOS.embodiment_registry import EmbodimentRegistry
 from PhyAgentOS.providers.base import LLMProvider
 from PhyAgentOS.providers.providers_manager import ProvidersManager
 from PhyAgentOS.session.manager import Session, SessionManager
@@ -72,6 +72,7 @@ class AgentLoop:
         runtime_workspace: Path | None = None,
         runtime_enabled: bool = True,
         runtime_target_enabled: dict[str, bool] | None = None,
+        session_verifier: Any | None = None,
     ):
         from PhyAgentOS.config.schema import ExecToolConfig
         self.bus = bus
@@ -86,6 +87,8 @@ class AgentLoop:
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
+        self.session_verifier = session_verifier
+        self.runtime_workspace = runtime_workspace
 
         self.context = ContextBuilder(
             workspace,
@@ -154,6 +157,17 @@ class AgentLoop:
             self.tools.register(ImageTool(self.provider, send_callback=self.bus.publish_outbound))
 
         self.tools.register(SceneGraphQueryTool(workspace=self.workspace))
+        if self.session_verifier is not None and self.runtime_workspace is not None:
+            from PhyAgentOS.agent.tools.session_replan import CreateReplannedSessionTool
+            from PhyAgentOS.agent.tools.session_verification import VerifySessionTool
+            from PhyAgentOS.runtime.watchdog.registry import SessionRegistry
+
+            self.tools.register(VerifySessionTool(self.session_verifier))
+            self.tools.register(
+                CreateReplannedSessionTool(
+                    SessionRegistry(Path(self.runtime_workspace) / "SESSIONS.md")
+                )
+            )
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""

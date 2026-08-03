@@ -225,9 +225,9 @@ def onboard():
 
 def _make_provider(config: Config):
     """Create the appropriate LLM provider from config."""
+    from PhyAgentOS.providers.azure_openai_provider import AzureOpenAIProvider
     from PhyAgentOS.providers.base import GenerationSettings
     from PhyAgentOS.providers.openai_codex_provider import OpenAICodexProvider
-    from PhyAgentOS.providers.azure_openai_provider import AzureOpenAIProvider
 
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
@@ -279,6 +279,52 @@ def _make_provider(config: Config):
         reasoning_effort=defaults.reasoning_effort,
     )
     return provider
+
+
+def _make_session_verifier(config: Config, provider):
+    """Create the Agent-owned verifier and its serializable child provider config."""
+    if not config.runtime.enabled or not config.agents.verification.service_enabled:
+        return None
+    from PhyAgentOS.agent.session_verifier import SessionVerifier
+
+    settings = config.agents.verification
+    model = settings.model or config.agents.defaults.model
+    provider_name = settings.provider or config.get_provider_name(model)
+    if not provider_name:
+        raise RuntimeError(f"cannot resolve verification provider for model {model!r}")
+    provider_name = provider_name.replace("-", "_")
+    provider_config = getattr(config.providers, provider_name, None)
+    if settings.provider is not None and provider_config is None:
+        raise RuntimeError(f"unknown verification provider {settings.provider!r}")
+    provider_spec = {
+        "provider_name": provider_name,
+        "model": model,
+        "api_key": provider_config.api_key if provider_config is not None else None,
+        "api_base": (
+            provider_config.api_base
+            if provider_config is not None and provider_config.api_base
+            else config.get_api_base(model)
+        ),
+        "extra_headers": (
+            provider_config.extra_headers if provider_config is not None else None
+        ),
+        "temperature": 0.0,
+        "max_tokens": min(4096, config.agents.defaults.max_tokens),
+        "reasoning_effort": config.agents.defaults.reasoning_effort,
+    }
+    return SessionVerifier(
+        workspace=config.runtime_workspace_path,
+        provider=provider,
+        model=model,
+        max_replans=settings.max_replans_per_episode,
+        evidence_retention=settings.evidence_retention,
+        timeout_s=settings.timeout_s,
+        service_host=settings.service_host,
+        service_port=settings.service_port,
+        service_provider_spec=provider_spec,
+        replan_timeout_s=settings.replan_timeout_s,
+        max_calls=settings.max_verifier_calls_per_run,
+    )
 
 
 def _load_runtime_config(config: str | None = None, workspace: str | None = None) -> Config:
@@ -376,6 +422,15 @@ def gateway(
     runtime_manager = _start_runtime_workspace_manager(config)
     bus = MessageBus()
     provider = _make_provider(config)
+    session_verifier = _make_session_verifier(config, provider)
+    recovery_coordinator = None
+    if session_verifier is not None:
+        from PhyAgentOS.agent.recovery_coordinator import AgentRecoveryCoordinator
+
+        recovery_coordinator = AgentRecoveryCoordinator(
+            workspace=config.runtime_workspace_path,
+            bus=bus,
+        )
     session_manager = SessionManager(config.workspace_path)
 
     # Create cron service first (callback set after agent creation)
@@ -402,6 +457,7 @@ def gateway(
         runtime_workspace=config.runtime_workspace_path,
         runtime_enabled=config.runtime.enabled,
         runtime_target_enabled=config.runtime.target_enabled,
+        session_verifier=session_verifier,
     )
 
     # Set cron callback (needs agent)
@@ -514,10 +570,15 @@ def gateway(
         try:
             await cron.start()
             await heartbeat.start()
-            await asyncio.gather(
+            services = [
                 agent.run(),
                 channels.start_all(),
-            )
+            ]
+            if session_verifier is not None:
+                services.append(session_verifier.run())
+            if recovery_coordinator is not None:
+                services.append(recovery_coordinator.run())
+            await asyncio.gather(*services)
         except KeyboardInterrupt:
             console.print("\nShutting down...")
         finally:
@@ -525,6 +586,10 @@ def gateway(
             heartbeat.stop()
             cron.stop()
             agent.stop()
+            if recovery_coordinator is not None:
+                recovery_coordinator.stop()
+            if session_verifier is not None:
+                session_verifier.stop()
             runtime_manager.stop_watchdog()
             await channels.stop_all()
 
@@ -554,7 +619,6 @@ def agent(
     from PhyAgentOS.bus.queue import MessageBus
     from PhyAgentOS.config.paths import get_cron_dir
     from PhyAgentOS.cron.service import CronService
-
     from PhyAgentOS.embodiment_registry import EmbodimentRegistry
 
     config = _load_runtime_config(config, workspace)
@@ -568,6 +632,15 @@ def agent(
 
     bus = MessageBus()
     provider = _make_provider(config)
+    session_verifier = _make_session_verifier(config, provider)
+    recovery_coordinator = None
+    if session_verifier is not None:
+        from PhyAgentOS.agent.recovery_coordinator import AgentRecoveryCoordinator
+
+        recovery_coordinator = AgentRecoveryCoordinator(
+            workspace=config.runtime_workspace_path,
+            bus=bus,
+        )
 
     # Create cron service for tool usage (no callback needed for CLI unless running)
     cron_store_path = get_cron_dir() / "jobs.json"
@@ -596,6 +669,7 @@ def agent(
         runtime_workspace=config.runtime_workspace_path,
         runtime_enabled=config.runtime.enabled,
         runtime_target_enabled=config.runtime.target_enabled,
+        session_verifier=session_verifier,
     )
 
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -617,11 +691,21 @@ def agent(
     if message:
         # Single message mode — direct call, no bus needed
         async def run_once():
+            verifier_task = (
+                asyncio.create_task(session_verifier.run())
+                if session_verifier is not None
+                else None
+            )
             try:
                 with _thinking_ctx():
                     response = await agent_loop.process_direct(message, session_id, on_progress=_cli_progress)
                 _print_agent_response(response, render_markdown=markdown)
             finally:
+                if session_verifier is not None:
+                    session_verifier.stop()
+                if verifier_task is not None:
+                    verifier_task.cancel()
+                    await asyncio.gather(verifier_task, return_exceptions=True)
                 runtime_manager.stop_watchdog()
                 await agent_loop.close_mcp()
 
@@ -655,6 +739,16 @@ def agent(
 
         async def run_interactive():
             bus_task = asyncio.create_task(agent_loop.run())
+            verifier_task = (
+                asyncio.create_task(session_verifier.run())
+                if session_verifier is not None
+                else None
+            )
+            recovery_task = (
+                asyncio.create_task(recovery_coordinator.run())
+                if recovery_coordinator is not None
+                else None
+            )
             turn_done = asyncio.Event()
             turn_done.set()
             turn_response: list[str] = []
@@ -725,9 +819,23 @@ def agent(
                         break
             finally:
                 agent_loop.stop()
+                if recovery_coordinator is not None:
+                    recovery_coordinator.stop()
+                if session_verifier is not None:
+                    session_verifier.stop()
                 runtime_manager.stop_watchdog()
                 outbound_task.cancel()
-                await asyncio.gather(bus_task, outbound_task, return_exceptions=True)
+                for task in (verifier_task, recovery_task):
+                    if task is not None:
+                        task.cancel()
+                await asyncio.gather(
+                    *[
+                        task
+                        for task in (bus_task, outbound_task, verifier_task, recovery_task)
+                        if task is not None
+                    ],
+                    return_exceptions=True,
+                )
                 await agent_loop.close_mcp()
 
         asyncio.run(run_interactive())

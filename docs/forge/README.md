@@ -120,9 +120,46 @@ python scripts/init_runtime_workspace.py --workspace ~/.PhyAgentOS/workspace
     target_endpoint: http://127.0.0.1:9001
     target_adapter: target_adapter://forge_gateway_passthrough
     runtime_contract_ref: configs/runtime/contracts/forge_gateway.runtime.yaml
+  observation:
+    observation_type: multimodal
+    empty_observation_allowed: false
+  config:
+    gateway_api: paos-forge-gateway-mvp-plus.v1
+    verification:
+      required_image_sources: [image/front]
+      capture_timeout_s: 5
+      post_capture_timeout_s: 5
+      max_artifact_bytes: 8388608
+      association_quality: best_effort
 ```
 
 `target_endpoint` 指向 Forge Gateway HTTP 地址。旧 workspace 可能仍使用 `forge_gateway_piper_sim`，建议迁移到 `forge_gateway`。
+`required_image_sources` 必须与 Gateway 配置的 `image_input_ids` 完全一致；示例中的
+`image/front` 不是硬编码行为规则，应按部署实际相机源修改。
+
+在 PAOS `config.json` 中可配置 Agent-owned verifier：
+
+```json
+{
+  "agents": {
+    "verification": {
+      "serviceEnabled": true,
+      "model": null,
+      "provider": null,
+      "timeoutS": 180,
+      "evidenceRetention": "failed",
+      "maxReplansPerEpisode": 2,
+      "maxVerifierCallsPerRun": 50,
+      "replanTimeoutS": 120,
+      "serviceHost": "127.0.0.1",
+      "servicePort": 8100
+    }
+  }
+}
+```
+
+`model/provider` 为空时沿用 Agent 默认模型和 provider。证据保留策略支持 `all`、
+`failed`、`none`；即使实体证据按策略删除，bundle 中的 digest、来源、时间和删除审计仍保留。
 
 ### 6. 启动 PAOS Agent
 
@@ -175,6 +212,18 @@ PAOS Agent 会读取 runtime workspace 中的 `RUNTIME.md`、`TARGETS.md`、`SKI
   target_ref: target://forge_gateway
   skillruntime_ref: skillruntime://forge_gateway_sam3
   task_description: grasp apple through Forge Gateway
+  verification:
+    mode: recovery
+    goal: grasp the apple and leave it securely held by the robot
+    success_criteria:
+      - the apple is visibly secured in the gripper after execution
+    constraints:
+      - do not disturb unrelated objects
+    evidence_policy:
+      profile: forge_visual_default
+      required_kinds: [rgb_image]
+      required_sources: []
+      minimum_association: best_effort
   status: pending
   priority: normal
   routing:
@@ -190,7 +239,9 @@ PAOS Agent 会读取 runtime workspace 中的 `RUNTIME.md`、`TARGETS.md`、`SKI
   result: {}
 ```
 
-然后手动执行一次 watchdog：
+如果使用 `off` 模式，可手动执行一次 watchdog。非 `off` 模式还要求 Agent-owned
+Verifier 正在运行；常规做法是通过 `python -m PhyAgentOS agent` 启动 Agent、Watchdog
+和 Verifier，而不是仅运行独立 watchdog：
 
 ```bash
 cd /path/to/PhyAgentOS
@@ -236,7 +287,8 @@ sed -n '1,200p' ~/.PhyAgentOS/workspace/LOG.md
 
 ## 当前调用链路
 
-当前实现同时存在两条链路。
+当前实现对 action session 和 runtime command 保留两条入口，但 action session 已统一
+接入系统级 verification 生命周期。
 
 ### Action Session 链路
 
@@ -248,11 +300,17 @@ sed -n '1,200p' ~/.PhyAgentOS/workspace/LOG.md
   -> 写入 SESSIONS.md
   -> WatchdogSupervisor
   -> GatewaySessionRunner
+  -> ForgeAdapter capability preflight
+  -> /ws/images + /ws/state capture before
   -> POST /agent/sessions
   -> Forge Gateway
   -> Dora PolicyCommand
   -> policy_command_status
-  -> PAOS SessionResult / LOG.md
+  -> /agent/sessions/{session_id} terminal identity check
+  -> /ws/images + /ws/state capture after
+  -> ExecutionRecord + forge_evidence_bundle_v1
+  -> awaiting_verification -> Agent Verifier
+  -> succeeded / failed / awaiting_replan
 ```
 
 触发条件是 session 绑定到 Forge Gateway target 或 skillruntime：
@@ -268,10 +326,27 @@ runtime_hints:
 代码入口：
 
 - `PhyAgentOS/runtime/gateway/session_runner.py`
+- `PhyAgentOS/runtime/gateway/adapter.py`
+- `PhyAgentOS/runtime/gateway/observation.py`
+- `PhyAgentOS/runtime/gateway/evidence.py`
 - `PhyAgentOS/runtime/watchdog/supervisor.py`
 - `PhyAgentOS/runtime/gateway/client.py`
 
-这条链路适合需要 session 状态和结果写回的动作，例如 `grasp`、`place`、`check_target`、`go_home`。
+Gateway `/agent/sessions` 和 `policy_command_status.request_id == command_id` 是唯一执行
+终态来源。Adapter 不使用静稳、固定等待或按动作定制的完成推断。Gateway 1.0.0 没有
+Evidence API，因此 WebSocket 证据关联明确标为 `best_effort`。
+
+Verifier 只读取任务 `goal`、`success_criteria`、`constraints`、Execution Record 和
+Evidence Bundle。它不读取或产生诸如 `grasp_verify_enabled` 的行为开关，也不会把
+Gateway `succeeded` 直接解释为任务成功。
+
+模式语义：
+
+- `off`：按 Gateway 执行事实终结。
+- `audit`：记录 verdict，保留执行派生终态，绝不 recovery。
+- `enforce`：verdict 决定任务结果，缺证或 verifier 错误 fail closed。
+- `recovery`：只有 `replan_required` 可回到正常 Agent Planner；Planner 必须通过
+  `create_replanned_session` 创建新 ID、新 runtime hints 和新 Gateway command ID。
 
 ### Runtime Command 链路
 
@@ -298,31 +373,10 @@ PAOS Agent / manual command
 python -m PhyAgentOS.runtime.gateway.command_adapter --workspace ~/.PhyAgentOS/workspace reset
 ```
 
-## 后续规划
+## 兼容边界
 
-当前 `SESSIONS.md + WatchdogSupervisor + GatewaySessionRunner` 是 Phase 3 兼容路径，用于最小代价接入 PAOS Runtime v2 的会话队列。
-
-后续建议逐步收敛为统一的 Agent command adapter：
-
-```text
-用户自然语言
-  -> PAOS Agent planner
-  -> ForgeGatewayCommandAdapter
-  -> Forge Gateway /agent/*
-  -> Forge dataflow
-  -> runtime context / result
-  -> PAOS Agent
-```
-
-目标 adapter 形态：
-
-```python
-adapter.get_capabilities()
-adapter.create_action_session(action_type="grasp", inputs={"target_name": "apple"})
-adapter.get_session(session_id)
-adapter.cancel_session(session_id)
-adapter.reset_runtime()
-adapter.get_context()
-```
-
-长期目标是让 PAOS Agent 只理解 Gateway capabilities、action manifest、runtime context 和 result，不再依赖 PAOS Runtime v2 的 target / skillruntime 执行模型。
+本接入仅支持 Forge Gateway 1.0.0，要求 capabilities 的
+`api_version == paos-forge-gateway-mvp-plus.v1` 以及 `sessions`、`command_id`、
+`runtime_context`、`serial_actions_only` 能力。旧 `forge_runtime` Gateway 不在兼容范围。
+所有适配、证据、验证和 recovery 代码均位于 PhyAgentOS；不会修改 Forge Gateway、
+Forge Runtime 或 Dora dataflow。

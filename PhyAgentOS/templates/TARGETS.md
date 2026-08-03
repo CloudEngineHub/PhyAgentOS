@@ -76,9 +76,8 @@ targets:
       target_adapter: target_adapter://forge_gateway_passthrough
       runtime_contract_ref: configs/runtime/contracts/forge_gateway.runtime.yaml
     observation:
-      observation_type: empty
-      empty_observation_allowed: true
-      empty_observation_semantics: gateway_runtime_context
+      observation_type: multimodal
+      empty_observation_allowed: false
     perception:
       enabled: false
       strict_preflight: true
@@ -88,6 +87,14 @@ targets:
     config:
       gateway_api: paos-forge-gateway-mvp-plus.v1
       action_manifest: actions/piper/sam3.md
+      verification:
+        required_image_sources:
+          - image/front
+        capture_timeout_s: 5
+        post_capture_timeout_s: 5
+        connection_timeout_s: 2
+        max_artifact_bytes: 8388608
+        association_quality: best_effort
   - id: unitree_r1_a5
     target_class: remote
     target_kind: real_robot

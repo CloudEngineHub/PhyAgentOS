@@ -76,6 +76,19 @@ sessions:
     target_ref: target://forge_gateway
     skillruntime_ref: skillruntime://forge_gateway_sam3
     task_description: grasp apple through Forge Gateway
+    verification:
+      mode: recovery
+      goal: grasp the apple and leave it securely held by the robot
+      success_criteria:
+        - the apple is visibly secured in the gripper after execution
+      constraints:
+        - do not disturb unrelated objects
+      evidence_policy:
+        profile: forge_visual_default
+        required_kinds:
+          - rgb_image
+        required_sources: []
+        minimum_association: best_effort
     status: pending
     priority: low
     timeouts:

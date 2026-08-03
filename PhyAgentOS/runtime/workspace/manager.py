@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import threading
-import time
 from dataclasses import dataclass, field
 from importlib.resources import files as pkg_files
 from pathlib import Path
@@ -53,6 +52,17 @@ sessions:
     target_ref: target://target_id_from_TARGETS
     skillruntime_ref: skillruntime://skillruntime_id_from_SKILLRUNTIME
     task_description: user-facing task description
+    verification:
+      mode: enforce
+      goal: task-level goal stated independently of the runtime action
+      success_criteria:
+        - observable condition that must be true when the task is complete
+      constraints: []
+      evidence_policy:
+        profile: semantic_default
+        required_kinds: [rgb_image]
+        required_sources: []
+        minimum_association: best_effort
     status: pending
     priority: normal
     timeouts:
@@ -93,6 +103,13 @@ Rules:
   that target's `supported_skillruntimes`.
 - Use endpoint values declared in `TARGETS.md` unless the user explicitly
   provides a different endpoint.
+- Every new session with `verification.mode` other than `off` must contain a
+  non-empty task goal and at least one observable success criterion. Criteria
+  and constraints describe the whole task; never encode verifier behavior in
+  an action-specific flag.
+- Use `audit` to record a verdict without changing the execution-derived
+  terminal state, `enforce` to fail closed without recovery, and `recovery` to
+  let the normal Agent Planner create a fresh child session.
 - Do not manually edit `ENVIRONMENT.md`; it is runtime state managed by
   PhyAgentOS.
 
@@ -123,8 +140,9 @@ Rules:
   `cmd_{session_id}` unless `gateway_action.command_id` is provided.
 - Gateway MVP+ is serial: do not create concurrent pending sessions for the
   same robot.
-- A Gateway `succeeded` status is command-level success. Treat physical task
-  success as `not_verified` unless a verifier or human observation confirms it.
+- A Gateway `succeeded` status is an immutable execution fact, not task success.
+  `ForgeAdapter` collects before/after evidence and the session's verification
+  policy determines whether the task succeeds.
 
 ### SAM3 Gateway Action Mapping
 
@@ -166,6 +184,8 @@ Gateway session rules:
 - Put the original user request in `task_description`.
 - Set `runtime_hints.gateway_action.source: paos-agent`.
 - Put extra action arguments under `runtime_hints.gateway_action.inputs`.
+- Do not write action-specific verification flags. Populate the same structured
+  `verification` contract for every kind of task.
 - For grasp-like actions, default `inputs.auto_home` to `false` unless the user
   asks to return home automatically.
 - If the user asks for a multi-step task, create one pending session at a time
@@ -217,6 +237,12 @@ class RuntimeWorkspaceManager:
                 self.workspace,
                 environment_workspace=self.environment_workspace,
                 poll_interval_s=self.config.runtime.watchdog_poll_interval_s,
+                verification_service_enabled=(
+                    self.config.agents.verification.service_enabled
+                ),
+                verification_timeout_s=(
+                    self.config.agents.verification.timeout_s + 30.0
+                ),
             )
             self._watchdog.start()
             report.watchdog_started = True
@@ -436,10 +462,14 @@ class BackgroundWatchdog:
         *,
         environment_workspace: Path,
         poll_interval_s: float,
+        verification_service_enabled: bool = False,
+        verification_timeout_s: float = 210.0,
     ):
         self.workspace = workspace
         self.environment_workspace = environment_workspace
         self.poll_interval_s = max(0.05, float(poll_interval_s))
+        self.verification_service_enabled = bool(verification_service_enabled)
+        self.verification_timeout_s = max(1.0, float(verification_timeout_s))
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, name="phyagentos-runtime-watchdog", daemon=True)
 
@@ -451,7 +481,12 @@ class BackgroundWatchdog:
         self._thread.join(timeout=2.0)
 
     def _run(self) -> None:
-        supervisor = WatchdogSupervisor(self.workspace, environment_workspace=self.environment_workspace)
+        supervisor = WatchdogSupervisor(
+            self.workspace,
+            environment_workspace=self.environment_workspace,
+            verification_service_enabled=self.verification_service_enabled,
+            verification_timeout_s=self.verification_timeout_s,
+        )
         while not self._stop.is_set():
             try:
                 ran = supervisor.run_once()
