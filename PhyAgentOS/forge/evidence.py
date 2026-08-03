@@ -37,11 +37,26 @@ class ForgeEvidenceWriter:
     def write_snapshot(self, phase: str, snapshot: ObservationSnapshot) -> str:
         if phase not in {"before", "after"}:
             raise ValueError(f"unsupported evidence phase: {phase}")
-        entries: list[dict] = []
+        planned_images: list[tuple[str, CapturedImage, Path]] = []
+        planned_paths: set[Path] = set()
         for source, image in snapshot.images.items():
-            suffix = self._suffix_for(image.media_type)
-            filename = f"{phase}_{self._safe_name(source)}_{image.sequence}.{suffix}"
-            path = self.evidence_dir / filename
+            if image.source_id != source:
+                raise ValueError(
+                    f"snapshot image source mismatch: key={source!r}, image={image.source_id!r}"
+                )
+            path = self._evidence_path(
+                self._image_filename(phase, source, image.sequence, image.media_type)
+            )
+            self._register_planned_path(path, planned_paths)
+            planned_images.append((source, image, path))
+
+        state_path: Path | None = None
+        if snapshot.state is not None:
+            state_path = self._evidence_path(f"{phase}_robot_state.json")
+            self._register_planned_path(state_path, planned_paths)
+
+        entries: list[dict] = []
+        for source, image, path in planned_images:
             atomic_write_bytes(path, image.data)
             entries.append(
                 {
@@ -54,8 +69,7 @@ class ForgeEvidenceWriter:
                     "uri": str(path.relative_to(self.workspace)),
                 }
             )
-        if snapshot.state is not None:
-            state_path = self.evidence_dir / f"{phase}_robot_state.json"
+        if snapshot.state is not None and state_path is not None:
             state_data = json.dumps(
                 snapshot.state.payload,
                 ensure_ascii=False,
@@ -85,12 +99,20 @@ class ForgeEvidenceWriter:
         return str(path.relative_to(self.workspace))
 
     def load_snapshot(self, reference: str) -> ObservationSnapshot:
+        snapshot, _, _ = self._load_snapshot(reference)
+        return snapshot
+
+    def _load_snapshot(
+        self, reference: str
+    ) -> tuple[ObservationSnapshot, dict[str, Path], Path | None]:
         path = self._workspace_path(reference)
         payload = json.loads(path.read_text(encoding="utf-8"))
         if payload.get("version") != "forge_observation_snapshot_v1":
             raise ValueError(f"unsupported Forge snapshot: {reference}")
         images: dict[str, CapturedImage] = {}
+        image_paths: dict[str, Path] = {}
         state: CapturedState | None = None
+        state_path: Path | None = None
         for entry in payload.get("entries", []):
             artifact_path = self._workspace_path(str(entry["uri"]))
             data = artifact_path.read_bytes()
@@ -105,12 +127,18 @@ class ForgeEvidenceWriter:
                     data=data,
                 )
                 images[image.source_id] = image
+                image_paths[image.source_id] = artifact_path
             elif entry["kind"] == "robot_state":
                 state = CapturedState(received_at, json.loads(data))
-        return ObservationSnapshot(
-            captured_at=datetime.fromisoformat(payload["captured_at"]),
-            images=images,
-            state=state,
+                state_path = artifact_path
+        return (
+            ObservationSnapshot(
+                captured_at=datetime.fromisoformat(payload["captured_at"]),
+                images=images,
+                state=state,
+            ),
+            image_paths,
+            state_path,
         )
 
     def write_bundle(
@@ -132,7 +160,8 @@ class ForgeEvidenceWriter:
                 missing.append(f"{phase}:snapshot")
                 continue
             try:
-                snapshots[phase] = self.load_snapshot(reference)
+                snapshot, image_paths, state_path = self._load_snapshot(reference)
+                snapshots[phase] = snapshot
             except Exception as exc:
                 snapshots[phase] = None
                 missing.append(f"{phase}:snapshot")
@@ -144,9 +173,13 @@ class ForgeEvidenceWriter:
                 if source not in snapshot.images:
                     missing.append(f"{phase}:rgb_image:{source}")
             for image in snapshot.images.values():
-                artifacts.append(self._image_artifact(phase, image))
+                artifacts.append(
+                    self._image_artifact(phase, image, image_paths[image.source_id])
+                )
             if snapshot.state is not None:
-                artifacts.append(self._state_artifact(phase, snapshot.state))
+                if state_path is None:
+                    raise ValueError(f"{phase} snapshot state has no artifact path")
+                artifacts.append(self._state_artifact(phase, snapshot.state, state_path))
             elif "robot_state" in required_kinds:
                 missing.append(f"{phase}:robot_state:ws/state")
         for phase in ("before", "after"):
@@ -212,11 +245,9 @@ class ForgeEvidenceWriter:
         except Exception as exc:
             raise ValueError("persisted Execution Record is invalid") from exc
 
-    def _image_artifact(self, phase: str, image: CapturedImage) -> EvidenceArtifact:
-        suffix = self._suffix_for(image.media_type)
-        path = self.evidence_dir / (
-            f"{phase}_{self._safe_name(image.source_id)}_{image.sequence}.{suffix}"
-        )
+    def _image_artifact(
+        self, phase: str, image: CapturedImage, path: Path
+    ) -> EvidenceArtifact:
         return self._artifact(
             path,
             phase=phase,
@@ -228,9 +259,11 @@ class ForgeEvidenceWriter:
             media_type=image.media_type,
         )
 
-    def _state_artifact(self, phase: str, state: CapturedState) -> EvidenceArtifact:
+    def _state_artifact(
+        self, phase: str, state: CapturedState, path: Path
+    ) -> EvidenceArtifact:
         return self._artifact(
-            self.evidence_dir / f"{phase}_robot_state.json",
+            path,
             phase=phase,
             kind="robot_state",
             source_id="ws/state",
@@ -276,6 +309,28 @@ class ForgeEvidenceWriter:
         if not path.is_relative_to(self.workspace):
             raise ValueError(f"artifact path escapes workspace: {relative}")
         return path
+
+    def _image_filename(
+        self, phase: str, source_id: str, sequence: int, media_type: str
+    ) -> str:
+        suffix = self._suffix_for(media_type)
+        if re.fullmatch(r"[a-z0-9]+", suffix) is None:
+            raise ValueError(f"invalid evidence file extension: {suffix!r}")
+        safe_label = self._safe_name(source_id)[:40]
+        source_digest = hashlib.sha256(source_id.encode("utf-8")).hexdigest()
+        return f"{phase}_{safe_label}_{source_digest}_{sequence}.{suffix}"
+
+    def _evidence_path(self, filename: str) -> Path:
+        path = (self.evidence_dir / filename).resolve()
+        if not path.is_relative_to(self.evidence_dir.resolve()):
+            raise ValueError(f"evidence path escapes evidence directory: {filename}")
+        return path
+
+    @staticmethod
+    def _register_planned_path(path: Path, planned_paths: set[Path]) -> None:
+        if path in planned_paths:
+            raise ValueError(f"duplicate evidence target path: {path.name}")
+        planned_paths.add(path)
 
     @staticmethod
     def _safe_name(value: str) -> str:
