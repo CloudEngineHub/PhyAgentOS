@@ -296,16 +296,23 @@ Optional black-box tests may use `FORGE_GATEWAY_URL` to connect to a running com
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep public contracts action-agnostic, preserve Execution Record immutability, and add failure-path tests for any change that touches physical execution, evidence, verification, recovery, or persistence.
+PRs and Issues are welcome! Check our development roadmap here → [Dev Plan](https://phy-agent-os.net/docs/developer-guide/).
 
 ---
 
 <div align="center">
-  Jointly developed by <b>Sun Yat-sen University HCP Lab</b>, <b>Peng Cheng Laboratory</b>, and <b>X-Era Lab</b>
-  <br><br>
-  <img src="docs/imgs/HCP.jpg" alt="HCP Lab" height="96">
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/imgs/Pengcheng.png" alt="Peng Cheng Laboratory" height="96">
-  <br><br>
-  <sub>MIT License · Copyright © 2025–2026 PhyAgentOS</sub>
+
+Jointly developed by **Sun Yat-sen University HCP Lab** & **Peng Cheng Laboratory** & **X-Era Lab**
+
+<br>
+
+<img src="docs/imgs/HCP.jpg" alt="HCP" height="128">
+&nbsp;&nbsp;&nbsp;
+<img src="docs/imgs/Pengcheng.png" alt="Pengcheng" height="128">
+&nbsp;&nbsp;&nbsp;
+<img src="docs/imgs/logo-xera-mark.png" alt="X-Era Lab" height="128">
+
+<br>
+<sub>MIT License · Copyright © 2025-2026 PhyAgentOS</sub>
+
 </div>

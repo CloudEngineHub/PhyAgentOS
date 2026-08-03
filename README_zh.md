@@ -296,16 +296,23 @@ python -m compileall -q PhyAgentOS tests
 
 ## 参与贡献
 
-欢迎提交 Issue 和 Pull Request。涉及物理执行、证据、验证、恢复或持久化的改动，应保持公共契约动作无关、Execution Record 不可变，并补充失败路径测试。
+欢迎提交 PR 和 Issue，我们的开发计划可以在此处查看👉 [开发计划](https://phy-agent-os.net/docs/developer-guide/)。
 
 ---
 
 <div align="center">
-  由<b>中山大学 HCP 实验室</b>、<b>鹏城实验室</b>与<b>拓元智慧</b>联合开发
-  <br><br>
-  <img src="docs/imgs/HCP.jpg" alt="HCP Lab" height="96">
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/imgs/Pengcheng.png" alt="鹏城实验室" height="96">
-  <br><br>
-  <sub>MIT License · Copyright © 2025–2026 PhyAgentOS</sub>
+
+由 **中山大学 HCP 实验室**、**鹏城实验室** 与 **拓元智慧** 联合开发
+
+<br>
+
+<img src="docs/imgs/HCP.jpg" alt="HCP" height="128">
+&nbsp;&nbsp;&nbsp;
+<img src="docs/imgs/Pengcheng.png" alt="Pengcheng" height="128">
+&nbsp;&nbsp;&nbsp;
+<img src="docs/imgs/logo-xera-mark.png" alt="X-Era Lab" height="128">
+
+<br>
+<sub>MIT License · Copyright © 2025-2026 PhyAgentOS</sub>
+
 </div>
