@@ -21,6 +21,9 @@
     <a href="https://phy-agent-os.net/">
       <img src="https://img.shields.io/badge/Website-online-FF6B35" alt="Website">
     </a>
+    <a href="https://github.com/PhyAgentOS/PhyAgentOS">
+      <img src="https://img.shields.io/badge/PRs-Welcome-2EA44F" alt="PRs">
+    </a>
   </p>
   <p>
     <sub><a href="README.md">English</a> · <a href="README_zh.md">中文</a> · <a href="docs/README.md">文档</a></sub>
