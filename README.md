@@ -34,8 +34,6 @@
 
 PhyAgentOS is an agent framework for embodied tasks. The Agent plans a high-level action, the Forge adapter records what the Gateway executed, the observation collector captures before/after evidence, and the task-level verifier decides whether the user-visible goal was actually achieved.
 
-> **The central rule:** Gateway `succeeded` is an execution fact, not proof of task success. Semantic success is determined by the task verification policy.
-
 ## 📢 Changelog
 
 | Version | Date | Update |
@@ -249,15 +247,6 @@ These tools are registered only when `forge.enabled` is true.
 
 `EMBODIED.md`, `ENVIRONMENT.md`, and SceneGraph remain knowledge surfaces. They are not execution queues. PAOS no longer reads or generates the former Runtime Markdown queue files.
 
-## Supported scope
-
-- One PAOS process configures one Forge Gateway endpoint.
-- One root task lineage owns the serialized execution slot until verification or recovery terminates.
-- One Forge session represents one high-level Gateway action; the Planner decomposes longer tasks.
-- Gateway, Forge Runtime, Dora dataflows, policy internals, and hardware drivers remain outside this repository.
-- Gateway 1.0.0 evidence correlation is `best_effort`; PAOS does not fabricate authoritative timestamps or causality.
-- Legacy PAOS Runtime, Target, SkillRuntime, Watchdog, SessionRunner, and Markdown execution queue compatibility is intentionally removed.
-
 ## Project structure
 
 ```text
@@ -268,9 +257,7 @@ PhyAgentOS/
 ├── PhyAgentOS/channels/       # Messaging channels
 ├── PhyAgentOS/config/         # Configuration schema and loading
 ├── PhyAgentOS/templates/      # Agent knowledge/workspace templates
-├── docs/                      # English, Chinese, operations, integration, Forge docs
-├── plan/                      # Historical design and review reports
-└── tests/                     # Contract, store, Gateway, evidence, verifier, E2E tests
+└── docs/                      # English, Chinese, operations, integration, Forge docs
 ```
 
 ## Documentation
