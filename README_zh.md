@@ -34,8 +34,6 @@
 
 PhyAgentOS 是一个面向具身任务的 Agent 框架。Agent 规划高层动作，Forge Adapter 记录 Gateway 的执行事实，观测采集器保存动作前后证据，任务级 Verifier 再判断用户目标是否真正达成。
 
-> **核心规则：** Gateway 的 `succeeded` 是动作执行事实，不是任务成功证明。任务语义是否成功由 verification policy 决定。
-
 ## 📢 更新日志
 
 | 版本 | 日期 | 更新内容 |
@@ -249,15 +247,6 @@ paos gateway
 
 `EMBODIED.md`、`ENVIRONMENT.md` 和 SceneGraph 继续作为知识面存在，但不承担执行队列职责。PAOS 不再读取或生成旧 Runtime Markdown queue 文件。
 
-## 支持范围
-
-- 一个 PAOS 进程只配置一个 Forge Gateway endpoint。
-- 一个 root task lineage 在验证或恢复终结前独占串行执行槽。
-- 一个 Forge session 对应一个高层 Gateway action；长任务由 Planner 拆分。
-- Gateway、Forge Runtime、Dora dataflow、策略内部和硬件驱动不属于本仓库修改范围。
-- Gateway 1.0.0 的证据关联为 `best_effort`；PAOS 不伪造 authoritative 时间或因果关系。
-- 旧 PAOS Runtime、Target、SkillRuntime、Watchdog、SessionRunner 和 Markdown 执行队列兼容性已明确移除。
-
 ## 项目结构
 
 ```text
@@ -268,9 +257,7 @@ PhyAgentOS/
 ├── PhyAgentOS/channels/       # 消息渠道
 ├── PhyAgentOS/config/         # 配置 Schema 与加载
 ├── PhyAgentOS/templates/      # Agent 知识/工作区模板
-├── docs/                      # 中英文、运维、接入与 Forge 文档
-├── plan/                      # 历史设计与评审报告
-└── tests/                     # 契约、Store、Gateway、证据、Verifier、E2E 测试
+└── docs/                      # 中英文、运维、接入与 Forge 文档
 ```
 
 ## 文档
