@@ -13,7 +13,7 @@
   </p>
   <p>
     <img src="https://img.shields.io/badge/Python-≥3.11-3776AB?logo=python&logoColor=white" alt="Python">
-    <img src="https://img.shields.io/badge/Version-v2.0.0-47A882" alt="Version">
+    <img src="https://img.shields.io/badge/Version-v0.2.0-47A882" alt="Version">
     <img src="https://img.shields.io/badge/License-MIT-3DA639" alt="License">
     <a href="https://arxiv.org/pdf/2607.16636">
       <img src="https://img.shields.io/badge/Tech_Report-arXiv-b31b1b?logo=arxiv&logoColor=white" alt="Tech Report">
@@ -38,7 +38,7 @@ PhyAgentOS is an agent framework for embodied tasks. The Agent plans a high-leve
 
 | Version | Date | Update |
 |:--------|:-----|:-------|
-| ![v2.0.0](https://img.shields.io/badge/v2.0.0-47A882) | 2026-08-03 | Introduced the Forge execution architecture with Forge Gateway 1.0.0, immutable execution and evidence contracts, system-level semantic verification, Planner-owned recovery, crash-safe SQLite orchestration, and complete removal of the legacy Runtime execution chain. |
+| ![v0.2.0](https://img.shields.io/badge/v0.2.0-47A882) | 2026-08-03 | Introduced the Forge execution architecture with Forge Gateway 1.0.0, immutable execution and evidence contracts, system-level semantic verification, Planner-owned recovery, crash-safe SQLite orchestration, and complete removal of the legacy Runtime execution chain. |
 | ![v0.1.7](https://img.shields.io/badge/v0.1.7-47A882) | 2026-07-05 | Added benchmarking for policy-loop and target-native builtin paths, plus the Agent verification and failure-recovery service. |
 | ![v0.1.6](https://img.shields.io/badge/v0.1.6-47A882) | 2026-06-27 | Added BEHAVIOR-1K support, `SessionVerifier`, and the explicit session-verification tool. |
 | ![v0.1.5](https://img.shields.io/badge/v0.1.5-47A882) | 2026-06-11 | Cleaned protocol files and documentation, moved game scenarios to the `general-game-agent` branch, and focused the main line on simulation and real-robot work. |

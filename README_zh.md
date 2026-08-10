@@ -13,7 +13,7 @@
   </p>
   <p>
     <img src="https://img.shields.io/badge/Python-≥3.11-3776AB?logo=python&logoColor=white" alt="Python">
-    <img src="https://img.shields.io/badge/Version-v2.0.0-47A882" alt="Version">
+    <img src="https://img.shields.io/badge/Version-v0.2.0-47A882" alt="Version">
     <img src="https://img.shields.io/badge/License-MIT-3DA639" alt="License">
     <a href="https://arxiv.org/pdf/2607.16636">
       <img src="https://img.shields.io/badge/技术报告-arXiv-b31b1b?logo=arxiv&logoColor=white" alt="技术报告">
@@ -38,7 +38,7 @@ PhyAgentOS 是一个面向具身任务的 Agent 框架。Agent 规划高层动�
 
 | 版本 | 日期 | 更新内容 |
 |:-----|:-----|:---------|
-| ![v2.0.0](https://img.shields.io/badge/v2.0.0-47A882) | 2026-08-03 | 引入 Forge 执行架构，全面对接 Forge Gateway 1.0.0；新增不可变 Execution/Evidence 公共契约、系统级语义验证、Planner 主导的恢复、崩溃安全 SQLite 编排，并彻底移除旧 Runtime 执行链。 |
+| ![v0.2.0](https://img.shields.io/badge/v0.2.0-47A882) | 2026-08-03 | 引入 Forge 执行架构，全面对接 Forge Gateway 1.0.0；新增不可变 Execution/Evidence 公共契约、系统级语义验证、Planner 主导的恢复、崩溃安全 SQLite 编排，并彻底移除旧 Runtime 执行链。 |
 | ![v0.1.7](https://img.shields.io/badge/v0.1.7-47A882) | 2026-07-05 | 支持 Policy loop 与 Target-native builtin 两条 Benchmark 路径，并加入 Agent 验证与失败恢复服务。 |
 | ![v0.1.6](https://img.shields.io/badge/v0.1.6-47A882) | 2026-06-27 | 增加 BEHAVIOR-1K 支持、`SessionVerifier` 与显式 Session 验证工具。 |
 | ![v0.1.5](https://img.shields.io/badge/v0.1.5-47A882) | 2026-06-11 | 清理协议文件与文档，将游戏场景迁移到 `general-game-agent` 分支，主线聚焦仿真与真机工作。 |
