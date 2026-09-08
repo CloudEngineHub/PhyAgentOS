@@ -136,7 +136,11 @@ class RuntimeManager:
             self._ensure_dora_up(manifest, profile, binary_root)
             launched = True
             self._start_flow(flow_name, manifest, profile, binary_root)
-            self._wait_until_ready(manifest, flow_name)
+            self._wait_until_ready(
+                manifest,
+                flow_name,
+                timeout_s=self._startup_timeout_s(profile),
+            )
             snapshot = self._gateway_snapshot(manifest) or {}
             data = snapshot.get("data") if isinstance(snapshot.get("data"), dict) else {}
             identity = data.get("gateway_identity") or data.get("gateway_id")
@@ -481,8 +485,19 @@ class RuntimeManager:
 
         return has_running(data)
 
-    def _wait_until_ready(self, manifest: SkillManifest, flow_name: str) -> None:
-        deadline = time.monotonic() + self.health_timeout_s
+    def _startup_timeout_s(self, profile: RuntimeProfile) -> float:
+        if profile.startup_timeout_s is None:
+            return self.health_timeout_s
+        return profile.startup_timeout_s
+
+    def _wait_until_ready(
+        self,
+        manifest: SkillManifest,
+        flow_name: str,
+        *,
+        timeout_s: float,
+    ) -> None:
+        deadline = time.monotonic() + timeout_s
         last_reason = "Gateway GET /tools is unavailable"
         while time.monotonic() < deadline:
             if not self._flow_running(flow_name):
