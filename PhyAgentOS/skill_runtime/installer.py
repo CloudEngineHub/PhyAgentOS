@@ -318,6 +318,37 @@ class NodeInstaller:
             raise InstallerError(f"invalid Forge node tar.gz archive: {exc}") from exc
 
 
+def _inject_node_environment(
+    rendered: str,
+    profile_environment: dict[str, str],
+    runtime_environment: dict[str, str],
+) -> str:
+    """Bind the launching runtime's environment to every Dora node.
+
+    Dora nodes inherit the environment of the daemon that spawns them, so a
+    pre-existing shared daemon can supply a stale HOME or
+    PAOS_SKILL_VERSION. Node-declared values win over the profile-level
+    environment, and runtime-derived identity wins over both.
+    """
+    try:
+        document = yaml.safe_load(rendered)
+    except yaml.YAMLError as exc:
+        raise InstallerError(f"rendered Skill dataflow is not valid YAML: {exc}") from exc
+    if not isinstance(document, dict) or not isinstance(document.get("nodes"), list):
+        raise InstallerError("rendered Skill dataflow must define a nodes list")
+    profile_values = {str(key): str(value) for key, value in profile_environment.items()}
+    runtime_values = {str(key): str(value) for key, value in runtime_environment.items()}
+    for node in document["nodes"]:
+        if not isinstance(node, dict):
+            raise InstallerError("rendered Skill dataflow node must be a mapping")
+        declared = node.get("env") or {}
+        if not isinstance(declared, dict):
+            raise InstallerError("rendered Skill dataflow node env must be a mapping")
+        declared_values = {str(key): str(value) for key, value in declared.items()}
+        node["env"] = {**profile_values, **declared_values, **runtime_values}
+    return yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
+
+
 class SkillEnvironmentBuilder:
     """Create immutable per-Skill executable views from exact node locks."""
 
@@ -364,6 +395,9 @@ class SkillEnvironmentBuilder:
             },
             "entrypoints": sorted(required),
             "dataflow": profile.dataflow.as_posix(),
+            "environment": {
+                str(key): str(value) for key, value in profile.environment.items()
+            },
         }
         profile_files: dict[str, str] = {}
         profile_parent = skill.bundle_root / profile.dataflow.parent
@@ -410,6 +444,17 @@ class SkillEnvironmentBuilder:
                 ).replace("${PAOS_SKILL_ROOT}", str(skill.bundle_root))
                 rendered = rendered.replace("${PAOS_SKILL_NAME}", skill.name).replace(
                     "${PAOS_SKILL_VERSION}", skill.version
+                )
+                rendered = _inject_node_environment(
+                    rendered,
+                    profile.environment,
+                    {
+                        "HOME": str(Path.home()),
+                        "PAOS_SKILL_NAME": skill.name,
+                        "PAOS_SKILL_VERSION": skill.version,
+                        "PAOS_SKILL_ROOT": str(skill.bundle_root),
+                        "FORGE_RUNTIME_BIN": str((target / "bin").resolve()),
+                    },
                 )
                 (launch_profile / profile.dataflow.name).write_text(
                     rendered, encoding="utf-8"

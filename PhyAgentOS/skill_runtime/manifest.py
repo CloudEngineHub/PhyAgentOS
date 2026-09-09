@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -23,6 +24,7 @@ _MANIFEST_FIELDS = {
 }
 _PROFILE_FIELDS = {
     "dataflow",
+    "startup_timeout_s",
     "required_binaries",
     "required_assets",
     "required_environment",
@@ -91,11 +93,23 @@ def _path_tuple(value: Any, label: str) -> tuple[Path, ...]:
     return tuple(_relative_path(item, f"{label} item") for item in value)
 
 
+def _optional_positive_float(value: Any, label: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ManifestError(f"{label} must be a positive number")
+    parsed = float(value)
+    if not isfinite(parsed) or parsed <= 0:
+        raise ManifestError(f"{label} must be a positive number")
+    return parsed
+
+
 @dataclass(frozen=True)
 class RuntimeProfile:
     """One launchable Dora profile in a Skill manifest."""
 
     dataflow: Path
+    startup_timeout_s: float | None = None
     required_binaries: tuple[Path, ...] = ()
     required_assets: tuple[Path, ...] = ()
     required_environment: tuple[str, ...] = ()
@@ -114,6 +128,9 @@ class RuntimeProfile:
         }
         return cls(
             dataflow=_relative_path(data.get("dataflow"), f"{label}.dataflow"),
+            startup_timeout_s=_optional_positive_float(
+                data.get("startup_timeout_s"), f"{label}.startup_timeout_s"
+            ),
             required_binaries=_path_tuple(
                 data.get("required_binaries"), f"{label}.required_binaries"
             ),

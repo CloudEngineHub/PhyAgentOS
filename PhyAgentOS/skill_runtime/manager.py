@@ -136,7 +136,11 @@ class RuntimeManager:
             self._ensure_dora_up(manifest, profile, binary_root)
             launched = True
             self._start_flow(flow_name, manifest, profile, binary_root)
-            self._wait_until_ready(manifest, flow_name)
+            self._wait_until_ready(
+                manifest,
+                flow_name,
+                timeout_s=self._startup_timeout_s(profile),
+            )
             snapshot = self._gateway_snapshot(manifest) or {}
             data = snapshot.get("data") if isinstance(snapshot.get("data"), dict) else {}
             identity = data.get("gateway_identity") or data.get("gateway_id")
@@ -461,28 +465,73 @@ class RuntimeManager:
         )
         if result.returncode != 0:
             return False
+        return self._has_active_flow(
+            self._parse_flow_list(result.stdout or ""), flow_name
+        )
+
+    @staticmethod
+    def _parse_flow_list(output: str) -> list[dict[str, Any]]:
+        """Parse ``dora list --format json`` output.
+
+        Some Dora builds emit a single JSON array; others emit NDJSON (one JSON
+        object per line). Accept both so the live flow is not misread.
+        """
+        text = (output or "").strip()
+        if not text:
+            return []
         try:
-            data = json.loads(result.stdout or "[]")
+            data = json.loads(text)
         except json.JSONDecodeError:
-            return flow_name in (result.stdout or "") and "running" in (
-                result.stdout or ""
-            ).lower()
+            data = None
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        if isinstance(data, dict):
+            return [data]
+        entries: list[dict[str, Any]] = []
+        for line in text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, dict):
+                entries.append(item)
+        return entries
 
-        def has_running(value: Any) -> bool:
-            if isinstance(value, dict):
-                name_matches = value.get("name") in {None, flow_name}
-                status = str(value.get("status", "")).lower()
-                if name_matches and status == "running":
-                    return True
-                return any(has_running(item) for item in value.values())
-            if isinstance(value, list):
-                return any(has_running(item) for item in value)
+    @staticmethod
+    def _has_active_flow(flows: list[dict[str, Any]], flow_name: str) -> bool:
+        """Return True only when ``flow_name`` has a live Running flow.
+
+        Historical Dora rows with the same name linger as Finished/Failed/
+        Succeeded with ``nodes == 0``; the live flow is the running entry
+        (prefer one that reports participating nodes).
+        """
+        running: list[dict[str, Any]] = []
+        for item in flows:
+            if item.get("name") not in {None, flow_name}:
+                continue
+            if str(item.get("status", "")).lower() == "running":
+                running.append(item)
+        if not running:
             return False
+        with_nodes = [item for item in running if item.get("nodes") not in (None, 0)]
+        return bool(with_nodes) if with_nodes else True
 
-        return has_running(data)
+    def _startup_timeout_s(self, profile: RuntimeProfile) -> float:
+        if profile.startup_timeout_s is None:
+            return self.health_timeout_s
+        return profile.startup_timeout_s
 
-    def _wait_until_ready(self, manifest: SkillManifest, flow_name: str) -> None:
-        deadline = time.monotonic() + self.health_timeout_s
+    def _wait_until_ready(
+        self,
+        manifest: SkillManifest,
+        flow_name: str,
+        *,
+        timeout_s: float,
+    ) -> None:
+        deadline = time.monotonic() + timeout_s
         last_reason = "Gateway GET /tools is unavailable"
         while time.monotonic() < deadline:
             if not self._flow_running(flow_name):
