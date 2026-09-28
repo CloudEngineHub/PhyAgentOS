@@ -410,3 +410,20 @@ python -m compileall -q PhyAgentOS tests
 <sub>MIT License · Copyright © 2025-2026 PhyAgentOS</sub>
 
 </div>
+
+---
+
+## 引用与致谢
+
+如果 PhyAgentOS 对你有帮助，欢迎引用我们的论文：
+
+```bibtex
+@article{liu2026phyagentos,
+  title={PhyAgentOS: A Self-Evolving Operating System for Embodied Agents with Decoupled Cognitive Planning and Physical Execution},
+  author={Liu, Yang and Chen, Weixing and Song, Xinshuai and Pu, Tao and Mo, Siwen and Bai, Yongjie and Chen, Zihao and Sun, Qianran and Zhong, Liruo and Shen, Ying and others},
+  journal={arXiv preprint arXiv:2607.16636},
+  year={2026}
+}
+```
+
+PhyAgentOS 的背后是一个让它成为可能的更广泛的社区。感谢 MuJoCo 与 ROS 的维护者，本项目建立在它们提供的物理仿真与中间件基础之上；也感谢各个开放基准套件的创建者，让具身智能体研究保持诚实、可比。同样感谢项目开源以来所有提交 issue、分享反馈和贡献代码的人。这既是我们的项目，也是你们的项目。

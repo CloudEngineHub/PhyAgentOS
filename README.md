@@ -431,3 +431,20 @@ Jointly developed by **Sun Yat-sen University HCP Lab** & **Peng Cheng Laborator
 <sub>MIT License · Copyright © 2025-2026 PhyAgentOS</sub>
 
 </div>
+
+---
+
+## Citation and Acknowledgement
+
+If you find PhyAgentOS helpful, please cite the paper:
+
+```bibtex
+@article{liu2026phyagentos,
+  title={PhyAgentOS: A Self-Evolving Operating System for Embodied Agents with Decoupled Cognitive Planning and Physical Execution},
+  author={Liu, Yang and Chen, Weixing and Song, Xinshuai and Pu, Tao and Mo, Siwen and Bai, Yongjie and Chen, Zihao and Sun, Qianran and Zhong, Liruo and Shen, Ying and others},
+  journal={arXiv preprint arXiv:2607.16636},
+  year={2026}
+}
+```
+
+Behind PhyAgentOS is a wider community that made it possible. We thank the maintainers of MuJoCo and ROS for the physics and middleware foundations this project stands on, and the creators of the open benchmark suites that keep embodied-agent research honest and comparable. Our thanks also go to everyone who has opened issues, shared feedback, and contributed code since the project went public. This is your project as much as ours.
