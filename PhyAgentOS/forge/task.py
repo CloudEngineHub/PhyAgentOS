@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterator, Literal
 from uuid import uuid4
 
+from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from PhyAgentOS.config.schema import ForgeConfig
@@ -472,12 +473,22 @@ class AgentTaskCoordinator:
             if not candidate_id:
                 raise AgentTaskError("primary Skill activation has no Forge binding candidate")
             try:
-                binding = await self.binding_resolver.freeze(candidate_id, task_id=task_id)
+                binding = await self.binding_resolver.freeze(
+                    candidate_id,
+                    task_id=task_id,
+                    activated_document_sha256=activation.content_sha256,
+                )
             except ForgeSkillBindingError as exc:
                 raise AgentTaskError(str(exc)) from exc
-            if activation.content_sha256 != binding.skill_document_sha256:
-                raise AgentTaskError(
-                    "activated SKILL.md does not match the installed Runtime binding"
+            if (
+                binding.workflow_document_sha256 is not None
+                and binding.workflow_document_sha256 != binding.skill_document_sha256
+            ):
+                logger.warning(
+                    "workflow document sha256 {} differs from the installed bundle "
+                    "document sha256 {}; proceeding with the locally modified document",
+                    binding.workflow_document_sha256[:12],
+                    binding.skill_document_sha256[:12],
                 )
         task = AgentTaskRecord(
             task_id=task_id,
