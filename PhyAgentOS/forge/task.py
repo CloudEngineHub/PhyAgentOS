@@ -473,20 +473,13 @@ class AgentTaskCoordinator:
             if not candidate_id:
                 raise AgentTaskError("primary Skill activation has no Forge binding candidate")
             try:
-                binding = await self.binding_resolver.freeze(candidate_id, task_id=task_id)
+                binding = await self.binding_resolver.freeze(
+                    candidate_id,
+                    task_id=task_id,
+                    activated_document_sha256=activation.content_sha256,
+                )
             except ForgeSkillBindingError as exc:
                 raise AgentTaskError(str(exc)) from exc
-            if (
-                binding.workflow_document_sha256 is not None
-                and activation.content_sha256 != binding.workflow_document_sha256
-            ):
-                logger.warning(
-                    "activated SKILL.md sha256 {} differs from the frozen workflow "
-                    "document sha256 {}; the document changed after activation, "
-                    "proceeding with the binding frozen at task creation",
-                    activation.content_sha256[:12],
-                    binding.workflow_document_sha256[:12],
-                )
             if (
                 binding.workflow_document_sha256 is not None
                 and binding.workflow_document_sha256 != binding.skill_document_sha256

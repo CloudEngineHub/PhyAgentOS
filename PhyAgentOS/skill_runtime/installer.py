@@ -308,7 +308,10 @@ class NodeInstaller:
 
     def satisfies(self, lock: NodeLock) -> bool:
         try:
-            self.load(lock)
+            # Install/cache acceptance must stay strict: a locally modified
+            # executable is not a valid cache hit and must not be reused by a
+            # subsequent install of the original archive.
+            self.load(lock, strict=True)
         except InstallerError:
             return False
         return True

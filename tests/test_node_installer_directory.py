@@ -161,11 +161,12 @@ def test_directory_receipt_pins_nested_binary_sha256(tmp_path: Path) -> None:
     )
     receipt = yaml.safe_load(receipt_text)
     assert receipt["binary_sha256"] == hashlib.sha256(b"#!/bin/sh\nexit 0\n").hexdigest()
-    # A locally modified executable only warns on the runtime path; the strict
-    # verification entry point (forge-node verify) must still reject it.
+    # A locally modified executable only warns on the runtime start path; the
+    # strict entry points (forge-node verify, install cache acceptance) reject it.
     entrypoint = _version_dir(installer, lock) / "lerobot_infer" / "lerobot_infer"
     entrypoint.write_bytes(b"tampered")
-    assert installer.satisfies(lock)
+    assert installer.load(lock).is_file()
+    assert not installer.satisfies(lock)
     with pytest.raises(InstallerError):
         installer.load(lock, strict=True)
 
