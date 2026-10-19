@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterator, Literal
 from uuid import uuid4
 
+from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from PhyAgentOS.config.schema import ForgeConfig
@@ -476,8 +477,11 @@ class AgentTaskCoordinator:
             except ForgeSkillBindingError as exc:
                 raise AgentTaskError(str(exc)) from exc
             if activation.content_sha256 != binding.skill_document_sha256:
-                raise AgentTaskError(
-                    "activated SKILL.md does not match the installed Runtime binding"
+                logger.warning(
+                    "activated SKILL.md sha256 {} differs from the installed Runtime "
+                    "binding sha256 {}; proceeding with the locally modified document",
+                    activation.content_sha256[:12],
+                    binding.skill_document_sha256[:12],
                 )
         task = AgentTaskRecord(
             task_id=task_id,

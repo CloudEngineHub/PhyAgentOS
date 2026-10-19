@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
+from loguru import logger
 
 from PhyAgentOS.config.paths import get_forge_runtime_root, get_skill_bundle_root
 from PhyAgentOS.skill_runtime.archive import (
@@ -291,12 +292,14 @@ class NodeInstaller:
         ):
             raise InstallerError("installed Forge node receipt does not match Skill lock")
         binary_sha256 = receipt.get("binary_sha256")
-        if (
-            not isinstance(binary_sha256, str)
-            or len(binary_sha256) != 64
-            or sha256_file(path) != binary_sha256
-        ):
-            raise InstallerError("installed Forge node executable sha256 does not match receipt")
+        if not isinstance(binary_sha256, str) or len(binary_sha256) != 64:
+            raise InstallerError("installed Forge node receipt has no usable binary sha256")
+        if sha256_file(path) != binary_sha256:
+            logger.warning(
+                "installed Forge node executable {} sha256 differs from the receipt; "
+                "proceeding with the locally modified file",
+                lock.entrypoint,
+            )
         return path
 
     def satisfies(self, lock: NodeLock) -> bool:

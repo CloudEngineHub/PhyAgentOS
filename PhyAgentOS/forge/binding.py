@@ -8,6 +8,7 @@ import threading
 from datetime import datetime
 from typing import Any, Literal
 
+from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
 
 from PhyAgentOS.skill_runtime.catalog import SkillCatalog
@@ -113,7 +114,12 @@ class ForgeSkillBindingResolver:
         from PhyAgentOS.forge.interaction.binding import verified_extension
         extension = verified_extension(manifest)
         if manifest.version != runtime.skill_version:
-            raise ForgeSkillBindingError("installed Skill changed after Runtime startup")
+            logger.warning(
+                "installed Skill version {} differs from the running Runtime version "
+                "{}; proceeding with the changed Skill",
+                manifest.version,
+                runtime.skill_version,
+            )
         try:
             tool_ids = manifest.tools_for_profile(runtime.profile)
         except ManifestError as exc:

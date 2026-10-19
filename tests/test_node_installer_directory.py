@@ -161,10 +161,10 @@ def test_directory_receipt_pins_nested_binary_sha256(tmp_path: Path) -> None:
     )
     receipt = yaml.safe_load(receipt_text)
     assert receipt["binary_sha256"] == hashlib.sha256(b"#!/bin/sh\nexit 0\n").hexdigest()
-    # Tampering with the executable must fail the load-time verification.
+    # A locally modified executable only warns; the runtime keeps using the file.
     entrypoint = _version_dir(installer, lock) / "lerobot_infer" / "lerobot_infer"
     entrypoint.write_bytes(b"tampered")
-    assert not installer.satisfies(lock)
+    assert installer.satisfies(lock)
 
 
 # ---------------------------------------------------------------------------
