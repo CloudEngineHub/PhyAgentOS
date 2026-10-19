@@ -6,6 +6,7 @@ import hashlib
 import json
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from loguru import logger
@@ -37,6 +38,9 @@ class ForgeSkillBindingCandidate(BindingModel):
     skill_version: str
     manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     skill_document_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workflow_document_sha256: str | None = Field(
+        default=None, pattern=r"^[0-9a-f]{64}$"
+    )
     runtime_profile: str
     runtime_instance_id: str
     gateway_url: str
@@ -53,6 +57,9 @@ class ForgeSkillBinding(BindingModel):
     skill_version: str
     manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     skill_document_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    workflow_document_sha256: str | None = Field(
+        default=None, pattern=r"^[0-9a-f]{64}$"
+    )
     runtime_profile: str
     runtime_instance_id: str
     gateway_url: str
@@ -83,7 +90,13 @@ def _response_data(response: dict[str, Any], label: str) -> dict[str, Any]:
 
 
 def _candidate_payload(candidate: ForgeSkillBindingCandidate) -> dict[str, Any]:
-    value = candidate.model_dump(mode="json", exclude={"candidate_id", "created_at"})
+    value = candidate.model_dump(
+        mode="json",
+        # workflow_document_sha256 is deliberately excluded: the workflow document
+        # may be edited locally between activation and task creation, and that must
+        # not invalidate the frozen binding (task creation only warns).
+        exclude={"candidate_id", "created_at", "workflow_document_sha256"},
+    )
     value["required_tools"] = sorted(value["required_tools"], key=lambda item: item["tool_id"])
     return value
 
@@ -91,9 +104,18 @@ def _candidate_payload(candidate: ForgeSkillBindingCandidate) -> dict[str, Any]:
 class ForgeSkillBindingResolver:
     """Preview, freeze, and continuously validate one active Skill runtime."""
 
-    def __init__(self, runtime_registry: Any, *, catalog: SkillCatalog | None = None) -> None:
+    def __init__(
+        self,
+        runtime_registry: Any,
+        *,
+        catalog: SkillCatalog | None = None,
+        skills_loader: Any | None = None,
+    ) -> None:
         self.runtime_registry = runtime_registry
         self.catalog = catalog or SkillCatalog()
+        # Optional SkillsLoader used to hash the document the agent actually reads
+        # (workspace overlay first) instead of the installed bundle document.
+        self.skills_loader = skills_loader
         self._candidates: dict[str, ForgeSkillBindingCandidate] = {}
         self._lock = threading.RLock()
         self.interaction_candidates: dict[str, dict] = {}
@@ -103,6 +125,32 @@ class ForgeSkillBindingResolver:
         if runtime is None:
             raise ForgeSkillBindingError("no ready Forge Skill runtime is active")
         return runtime
+
+    def _workflow_document_sha256(self, skill_name: str, installed_sha256: str) -> str:
+        """Hash the document the agent actually reads (workspace overlay first).
+
+        Falls back to the installed bundle document hash when no loader is wired
+        or resolution fails, so provenance lookup never blocks binding.
+        """
+        if self.skills_loader is None:
+            return installed_sha256
+        try:
+            resolved = self.skills_loader.resolve_skill(
+                skill_name, require_available=False
+            )
+        except Exception:
+            return installed_sha256
+        if resolved is None:
+            return installed_sha256
+        try:
+            return hashlib.sha256(Path(resolved["path"]).read_bytes()).hexdigest()
+        except OSError:
+            logger.warning(
+                "resolved workflow document for Skill {} is unreadable; "
+                "falling back to the installed bundle document hash",
+                skill_name,
+            )
+            return installed_sha256
 
     async def preview(self, skill_name: str) -> ForgeSkillBindingCandidate:
         runtime = self._runtime()
@@ -114,12 +162,7 @@ class ForgeSkillBindingResolver:
         from PhyAgentOS.forge.interaction.binding import verified_extension
         extension = verified_extension(manifest)
         if manifest.version != runtime.skill_version:
-            logger.warning(
-                "installed Skill version {} differs from the running Runtime version "
-                "{}; proceeding with the changed Skill",
-                manifest.version,
-                runtime.skill_version,
-            )
+            raise ForgeSkillBindingError("installed Skill changed after Runtime startup")
         try:
             tool_ids = manifest.tools_for_profile(runtime.profile)
         except ManifestError as exc:
@@ -155,6 +198,7 @@ class ForgeSkillBindingResolver:
             )
         manifest_path = manifest.bundle_root / "skill.yaml"
         document_path = manifest.resolve_bundle_path(manifest.skill_document)
+        installed_document_sha256 = hashlib.sha256(document_path.read_bytes()).hexdigest()
         seed = {
             "skill": skill_name,
             "runtime": runtime.runtime_instance_id,
@@ -165,7 +209,10 @@ class ForgeSkillBindingResolver:
             skill_name=skill_name,
             skill_version=manifest.version,
             manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
-            skill_document_sha256=hashlib.sha256(document_path.read_bytes()).hexdigest(),
+            skill_document_sha256=installed_document_sha256,
+            workflow_document_sha256=self._workflow_document_sha256(
+                skill_name, installed_document_sha256
+            ),
             runtime_profile=runtime.profile,
             runtime_instance_id=runtime.runtime_instance_id,
             gateway_url=runtime.gateway_url,

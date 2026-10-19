@@ -476,11 +476,25 @@ class AgentTaskCoordinator:
                 binding = await self.binding_resolver.freeze(candidate_id, task_id=task_id)
             except ForgeSkillBindingError as exc:
                 raise AgentTaskError(str(exc)) from exc
-            if activation.content_sha256 != binding.skill_document_sha256:
+            if (
+                binding.workflow_document_sha256 is not None
+                and activation.content_sha256 != binding.workflow_document_sha256
+            ):
                 logger.warning(
-                    "activated SKILL.md sha256 {} differs from the installed Runtime "
-                    "binding sha256 {}; proceeding with the locally modified document",
+                    "activated SKILL.md sha256 {} differs from the frozen workflow "
+                    "document sha256 {}; the document changed after activation, "
+                    "proceeding with the binding frozen at task creation",
                     activation.content_sha256[:12],
+                    binding.workflow_document_sha256[:12],
+                )
+            if (
+                binding.workflow_document_sha256 is not None
+                and binding.workflow_document_sha256 != binding.skill_document_sha256
+            ):
+                logger.warning(
+                    "workflow document sha256 {} differs from the installed bundle "
+                    "document sha256 {}; proceeding with the locally modified document",
+                    binding.workflow_document_sha256[:12],
                     binding.skill_document_sha256[:12],
                 )
         task = AgentTaskRecord(

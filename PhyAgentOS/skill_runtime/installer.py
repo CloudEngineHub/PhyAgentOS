@@ -266,7 +266,7 @@ class NodeInstaller:
         finally:
             shutil.rmtree(temporary, ignore_errors=True)
 
-    def load(self, lock: NodeLock) -> Path:
+    def load(self, lock: NodeLock, *, strict: bool = False) -> Path:
         self._verify_lock_host(lock)
         install_root = self.root / lock.node_id / "versions" / lock.artifact_id
         path = _entrypoint_path(lock, install_root)
@@ -295,6 +295,10 @@ class NodeInstaller:
         if not isinstance(binary_sha256, str) or len(binary_sha256) != 64:
             raise InstallerError("installed Forge node receipt has no usable binary sha256")
         if sha256_file(path) != binary_sha256:
+            if strict:
+                raise InstallerError(
+                    "installed Forge node executable sha256 does not match receipt"
+                )
             logger.warning(
                 "installed Forge node executable {} sha256 differs from the receipt; "
                 "proceeding with the locally modified file",
