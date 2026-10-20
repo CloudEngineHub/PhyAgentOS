@@ -96,6 +96,10 @@ class ToolExecutionRecord(BaseModel):
     attempt_id: str | None = None
     response: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
+    # True only when the Gateway proved the invoke was rejected before anything
+    # reached the provider. Such a record documents a tool call that never
+    # executed, so task finalization must neither require nor be failed by it.
+    rejected_before_dispatch: bool = False
     evidence_refs: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -653,6 +657,7 @@ class AgentTaskCoordinator:
                 invocation_id=invocation_id,
                 attempt_id=attempt_id,
                 error={"type": type(exc).__name__, "message": str(exc)},
+                rejected_before_dispatch=rejected_before_dispatch,
             )
             if invocation_id and self.runtime_invocation_ids is not None:
                 self._track_remote_identity(
@@ -1222,6 +1227,7 @@ class AgentTaskCoordinator:
         attempt_id: str | None = None,
         response: dict[str, Any] | None = None,
         error: dict[str, Any] | None = None,
+        rejected_before_dispatch: bool = False,
     ) -> None:
         def mutate(current: AgentTaskRecord) -> None:
             record = _task_execution(current, record_id)
@@ -1230,6 +1236,7 @@ class AgentTaskCoordinator:
             record.attempt_id = attempt_id or record.attempt_id
             record.response = response
             record.error = error
+            record.rejected_before_dispatch = rejected_before_dispatch
             record.updated_at = utc_now()
 
         self.store.update(task_id, mutate, event_type="tool_execution_finished")
@@ -1436,12 +1443,20 @@ def _cancel_terminal_status(task: AgentTaskRecord) -> AgentTaskStatus:
         if item.semantics == "action"
         or (item.semantics == "session" and item.ownership == "task")
     ]
-    if not owned or all(item.status in {"cancelled", "stopped"} for item in owned):
+    if not owned or all(
+        item.status in {"cancelled", "stopped"} or item.rejected_before_dispatch
+        for item in owned
+    ):
         return AgentTaskStatus.CANCELLED
     return AgentTaskStatus.FAILED
 
 
 def _execution_facts_succeeded(task: AgentTaskRecord) -> bool:
+    executed = [item for item in task.execution_records if not item.rejected_before_dispatch]
+    if not executed:
+        # Every recorded call was rejected before dispatch: nothing ran, so the
+        # task cannot be reported as succeeded.
+        return False
     return all(
         item.status == "succeeded"
         or (
@@ -1454,7 +1469,7 @@ def _execution_facts_succeeded(task: AgentTaskRecord) -> bool:
                 )
             )
         )
-        for item in task.execution_records
+        for item in executed
     )
 
 
@@ -1472,6 +1487,9 @@ def _remote_identity(exc: Exception) -> tuple[str | None, str | None]:
 # Gateway error codes that are only raised before anything is dispatched to a
 # provider. An invoke that fails with one of these provably left no remote
 # state, so its execution is definitively failed rather than unknown.
+# The gateway attaches `error.code` to Action admission rejections from 1.1.2
+# onward; older releases return an unstructured 503 and are therefore still
+# recorded as unknown, which is the safe reading.
 # FORGE_TOOL_INVOKE_TIMEOUT is deliberately absent: the gateway also emits it
 # after dispatch when the synchronous caller response times out, where the
 # provider may still be executing and the outcome is genuinely unknown.
