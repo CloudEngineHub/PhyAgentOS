@@ -642,10 +642,14 @@ class AgentTaskCoordinator:
             remote_invocation_id, remote_attempt_id = _remote_identity(exc)
             invocation_id = remote_invocation_id or invocation_id
             attempt_id = remote_attempt_id or attempt_id
+            # A structured pre-dispatch rejection leaves no remote state, so
+            # the record is definitively failed: the identical-Action guard
+            # must not arm and block a later identical resend.
+            rejected_before_dispatch = _rejected_before_dispatch(exc)
             self._finish_execution(
                 task_id,
                 record_id,
-                status="unknown",
+                status="failed" if rejected_before_dispatch else "unknown",
                 invocation_id=invocation_id,
                 attempt_id=attempt_id,
                 error={"type": type(exc).__name__, "message": str(exc)},
@@ -1463,6 +1467,32 @@ def _remote_identity(exc: Exception) -> tuple[str | None, str | None]:
         invocation_id if isinstance(invocation_id, str) and invocation_id else None,
         attempt_id if isinstance(attempt_id, str) and attempt_id else None,
     )
+
+
+# Gateway error codes that are only raised before anything is dispatched to a
+# provider. An invoke that fails with one of these provably left no remote
+# state, so its execution is definitively failed rather than unknown.
+# FORGE_TOOL_INVOKE_TIMEOUT is deliberately absent: the gateway also emits it
+# after dispatch when the synchronous caller response times out, where the
+# provider may still be executing and the outcome is genuinely unknown.
+_PRE_DISPATCH_REJECTION_CODES = frozenset(
+    (
+        "FORGE_TOOL_GATEWAY_BUSY",
+        "FORGE_TOOL_ACTION_ADMISSION_REJECTED",
+        "FORGE_TOOL_ENDPOINT_UNKNOWN",
+        "FORGE_TOOL_OPERATION_NOT_FOUND",
+        "FORGE_TOOL_ENDPOINT_UNAVAILABLE",
+    )
+)
+
+
+def _rejected_before_dispatch(exc: Exception) -> bool:
+    """True when the gateway rejected the invoke without dispatching it."""
+    error_code = getattr(exc, "error_code", None)
+    if error_code not in _PRE_DISPATCH_REJECTION_CODES:
+        return False
+    invocation_id, attempt_id = _remote_identity(exc)
+    return invocation_id is None and attempt_id is None
 
 
 def _fail_replan(task: AgentTaskRecord, message: str) -> None:
