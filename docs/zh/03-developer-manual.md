@@ -215,3 +215,8 @@ pytest -q
 - [Forge Tool API 接入契约](../forge/README_zh.md)
 - [集成开发指南](../user_development_guide/README.md)
 - [Agent 经验与 Skill 自进化](05-agent-experience-and-skill-evolution.md)
+
+## 节点开发与实战示例
+
+- [TrackB 框架说明](../user_development_guide/track_b/README_zh.md)
+- [Piper X MuJoCo 二次开发](../user_development_guide/PIPER_X_DEMO_zh.md)

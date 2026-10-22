@@ -4,6 +4,10 @@
 
 > 版本：1.0.0
 
+如果目标是在现有执行链中增加一种仿真机械臂，先从
+[Piper X 开发示例](PIPER_X_DEMO_zh.md)入手；需要修改设备驱动或节点算法时，先查
+[TrackB 架构、协议与源码入口](track_b/README_zh.md)。两条路径分别对应 Skill 配置/模型扩展与 Node 源码开发。
+
 ## 1. 选择接入点
 
 | 能力 | 接入点 |
@@ -295,3 +299,9 @@ WebSocket association 提升为权威。
 - [开发者手册](../zh/03-developer-manual.md)
 - [通信架构](COMMUNICATION.md)
 - [Forge Tool API 契约](../forge/README_zh.md)
+
+## TrackB 框架与 Skill 开发
+
+- [TrackB 框架说明](track_b/README_zh.md)：整体架构、分类仓库目录、公共协议、Runtime 实际关系。
+- [TrackB Skill 开发手册](track_b/SKILL_DEVELOPMENT_zh.md)：原 profile 调参、新增 profile、独立 Node 开发三种模式的难度、流程和验收。
+- [Piper X MuJoCo 二次开发 demo](PIPER_X_DEMO_zh.md)：模型、profile、两种控制模式、打包验收与下一种机器人的接入清单。

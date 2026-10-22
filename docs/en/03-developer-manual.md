@@ -228,3 +228,8 @@ conditional on independently installed matching artifacts and Dora availability.
 - [Forge Tool API Integration Contract](../forge/README.md)
 - [Integration Development Guide](../user_development_guide/README_en.md)
 - [Agent Experience and Skill Evolution](05-agent-experience-and-skill-evolution.md)
+
+## Node development references
+
+- [TrackB framework guide](../user_development_guide/track_b/README.md)
+- [Piper X MuJoCo development example](../user_development_guide/PIPER_X_DEMO.md)
