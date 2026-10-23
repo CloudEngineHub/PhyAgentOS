@@ -2,11 +2,13 @@
 
 [English](PIPER_X_DEMO.md) | [简体中文](PIPER_X_DEMO_zh.md)
 
-[集成开发指南](README.md) · [TrackB 框架说明](track_b/README_zh.md) · [三种开发模式](track_b/SKILL_DEVELOPMENT_zh.md) · [示例代码](../../example/robot-control-sim-piper-x/README_zh.md)
+[Bundle 与 Tool 接入参考](README_zh.md) · [TrackB 框架说明](track_b/README_zh.md) · [三种开发模式](track_b/SKILL_DEVELOPMENT_zh.md) · [示例代码](../../example/robot-control-sim-piper-x/README_zh.md)
 
 > 本教程将一次实际二次开发过程整理为可复用示例。范围：MuJoCo 仿真、关节目标和末端位姿运动。
 > 运行基线：Core v1.1.0、Dora CLI 0.4.1、robot-control-sim 0.1.2 原始 Node locks。
 > 配套脚本生成并验证派生 Skill，不升级锁定的 Node。
+
+**平台开放范围：** 外部贡献提交及已有登记仓库修改暂未开放，需等待审批服务完成并开放。当前登记与发布由管理员维护；可先进行本地开发验证。下文的平台发布步骤以相关流程开放为前提，详见[贡献指南](../../CONTRIBUTING_zh.md)。
 
 ## 1. 目标、基线与边界
 

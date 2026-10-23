@@ -4,7 +4,7 @@
   <p>
     <a href="https://arxiv.org/abs/2607.16636">技术报告</a> ·
     <a href="https://phy-agent-os.net/">官网</a> ·
-    <a href="docs/README.md">文档</a> ·
+    <a href="docs/README_zh.md">文档</a> ·
     <a href="https://discord.gg/YJztZ4wUM">Discord</a>
   </p>
   <p>
@@ -55,7 +55,7 @@
 - **Provider 管理：** 集中配置、连接测试、认证、模型发现、模型选择保存与会话级覆盖。
 - **更多模型接入：** 直接支持 OpenAI Responses API 的工具调用、多模态输入、推理强度与 Forge 验证；新增 Requesty、Cheaper Inference 和 API Route 网关。
 - **Skill Runtime 更新：** `directory_tar_gz` Node 包可携带运行时依赖并校验内部相对符号链接；profile 支持启动超时、`required_tools` 覆盖，以及用于 LIBERO 0.3.4 前置准备的启动 hook 上下文。
-- **受治理的交互基础（默认关闭）：** 通过冻结绑定、持久化 Runner 和 Supervisor，将 AgentTask、Session、多步决策、独立根目标验证与一条去重的经验 episode 连接起来。参见[适用范围与启用说明](docs/interaction/README.md)。
+- **受治理的交互基础（默认关闭）：** 通过冻结绑定、持久化 Runner 和 Supervisor，将 AgentTask、Session、多步决策、独立根目标验证与一条去重的经验 episode 连接起来。参见[适用范围与启用说明](docs/interaction/README_zh.md)。
 - **可靠性改进：** 保留有效 cron 任务，完善 Dora 状态解析和 profile 环境注入、归档与图片路径处理，并在模型调用失败时保留对话历史。取消后拒绝新的执行意图并丢弃迟到决策；不确定操作不会自动重发，资源保护保持到执行状态完成核对。
 - **指南与验证：** 扩展回归测试和构建检查，完善双语文档、Piper 与 LIBERO-10 快速启动，以及评测范围和结果说明。
 
@@ -162,7 +162,7 @@ paos agent
 
 收到模型回复即完成核心 Agent 与模型服务的连通检查；`paos agent` 会打开交互式对话。执行物理任务还需要启动对应的 Skill Runtime。
 
-其他模型服务与部署方式见 [用户手册](docs/zh/02-user-manual.md) · [Docker 部署](docs/user_manual/DOCKER.md).
+其他模型服务与部署方式见 [用户手册](docs/zh/02-user-manual.md) · [Docker 部署](docs/user_manual/DOCKER_zh.md).
 
 <a id="control-modes"></a>
 ## 一套执行框架，三种控制方式
@@ -256,7 +256,7 @@ paos skill stop <skill-name>
 paos gateway
 ```
 
-`paos gateway` 运行已配置的消息渠道与后台服务。就绪检查与排障见 [运行手册](docs/user_manual/README.md).
+`paos gateway` 运行已配置的消息渠道与后台服务。就绪检查与排障见 [运行手册](docs/user_manual/README_zh.md).
 
 每个 Physical Execution Skill Bundle 声明工作流文档、所需 Tool ID、命名 Runtime profile，以及精确的
 平台/架构 Node lock。每个锁定归档具有精确 SHA-256；`executable_tar_gz` 只包含一个指定文件名的
@@ -265,7 +265,7 @@ paos gateway
 `python scripts/package_skill.py <bundle-dir> --output-dir <directory>` 可生成确定性发布 Bundle。
 PhyAgentOS 源码与发布包不内置具体 Physical Execution Skill、Physical Execution node、模型或仿真资源；
 部署者只需独立获取实际需要的 Skill 并显式安装。
-[集成开发指南](docs/user_development_guide/README.md#5-打包发布与本地闭环)说明 Bundle 布局、
+[Bundle 与 Tool 接入参考](docs/user_development_guide/README_zh.md#5-打包发布与本地闭环)说明 Bundle 布局、
 本地验证、不可变发布顺序与 Registry 验收。
 
 </details>
@@ -284,11 +284,11 @@ PhyAgentOS 源码与发布包不内置具体 Physical Execution Skill、Physical
 | 我想…… | 阅读入口 |
 | --- | --- |
 | 安装、配置并运行 PhyAgentOS | [用户手册](docs/zh/02-user-manual.md) |
-| 开发 Skill 或接入新环境 | [集成开发指南](docs/user_development_guide/README.md) |
+| 开发 Skill 或接入新环境 | [TrackB 开发指南](docs/user_development_guide/track_b/README_zh.md) |
 | 了解 Physical Execution API | [Physical Execution Tool API](docs/forge/README_zh.md) |
-| 开发与测试 Core | [开发者手册](docs/zh/03-developer-manual.md) |
+| 开发与测试 Core | [Core 开发者手册](docs/zh/03-developer-manual.md) |
 | 查看测评数值与来源 | [Benchmark](docs/benchmarks.md) |
-| 浏览全部文档 | [文档索引](docs/README.md) |
+| 浏览全部文档 | [文档索引](docs/README_zh.md) |
 
 <a id="news"></a>
 ## News · 最新动态

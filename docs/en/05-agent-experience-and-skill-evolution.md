@@ -202,6 +202,6 @@ This boundary also allows other trusted task providers to reuse Lesson clusterin
 
 - [Framework Introduction](01-framework-introduction.md)
 - [User Manual](02-user-manual.md)
-- [Developer Manual](03-developer-manual.md)
+- [Core Developer Manual](03-developer-manual.md)
 - [Forge Configuration Reference](04-forge-configuration-reference.md)
 - [Documentation Index](../README.md)

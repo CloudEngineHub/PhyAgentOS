@@ -7,6 +7,8 @@
 本页区分三种二次开发模式。先根据现有 Node 是否支持目标能力选择改动范围，再决定是否重建二进制。
 模型/profile 的完整可执行示例见 [PIPER_X_DEMO.md](../PIPER_X_DEMO_zh.md)。
 
+**平台开放范围：** 外部贡献提交及已有登记仓库修改暂未开放，需等待审批服务完成并开放。当前登记与发布由管理员维护；可先进行本地开发验证。下文的平台发布步骤以相关流程开放为前提，详见[贡献指南](../../../CONTRIBUTING_zh.md)。
+
 ## 1. 三种模式与难度
 
 | 模式 | 典型目标 | 主要改动 | Node 制品 | 相对难度与要求 |
@@ -285,4 +287,4 @@ GitHub push/Release、资源平台登记、技术校验、审核发布、Core �
 
 - [Piper X 完整 demo](../PIPER_X_DEMO_zh.md)：从官方模型到 profile、两种原生 Action 和停止的完整命令。
 - [Runtime 实际关系](RUNTIME_zh.md)：robot-control-sim 的五个 Tool、三个 Endpoint、三个 provider 与九节点图。
-- [集成开发指南](../README.md)：manifest、ToolSpec、任务绑定和通用验收契约。
+- [Bundle 与 Tool 接入参考](../README_zh.md)：manifest、ToolSpec、任务绑定和通用验收契约。

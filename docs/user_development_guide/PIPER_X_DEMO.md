@@ -2,11 +2,13 @@
 
 [English](PIPER_X_DEMO.md) | [简体中文](PIPER_X_DEMO_zh.md)
 
-[Integration development guide](README_en.md) · [TrackB framework](track_b/README.md) · [Three development modes](track_b/SKILL_DEVELOPMENT.md) · [Example code](../../example/robot-control-sim-piper-x/README.md)
+[Bundle and Tool integration reference](README.md) · [TrackB framework](track_b/README.md) · [Three development modes](track_b/SKILL_DEVELOPMENT.md) · [Example code](../../example/robot-control-sim-piper-x/README.md)
 
 > A reusable extension tutorial for MuJoCo simulation, joint targets and end-effector poses.
 > Runtime baseline: Core v1.1.0, Dora CLI 0.4.1, original robot-control-sim 0.1.2 Node locks.
 > Companion scripts build/validate a derived Skill without upgrading its locked Nodes.
+
+**Platform availability:** External resource submissions and changes to existing registered repositories are not yet open. They must wait for the approval service to be completed and opened. Current registration/publication is administrator-managed. Local development and validation can proceed; platform publication steps below are conditional on that workflow becoming available. See the [contribution guide](../../CONTRIBUTING.md).
 
 ## 1. Goal, baseline and scope
 

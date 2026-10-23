@@ -163,7 +163,7 @@ paos agent
 
 You should receive a model response; `paos agent` opens an interactive conversation. This checks the core Agent and provider connection. Physical execution additionally needs a running Skill Runtime.
 
-Need another provider or deployment option? See the [user manual](docs/en/02-user-manual.md) · [Docker](docs/user_manual/DOCKER_en.md).
+Need another provider or deployment option? See the [user manual](docs/en/02-user-manual.md) · [Docker](docs/user_manual/DOCKER.md).
 
 <a id="control-modes"></a>
 ## One framework, three control modes
@@ -257,7 +257,7 @@ paos skill stop <skill-name>
 paos gateway
 ```
 
-`paos gateway` runs configured message channels and background services. For readiness checks and troubleshooting, see the [operations guide](docs/user_manual/README_en.md).
+`paos gateway` runs configured message channels and background services. For readiness checks and troubleshooting, see the [operations guide](docs/user_manual/README.md).
 
 Each Physical Execution Skill bundle declares its workflow document, required Tool IDs, named runtime profiles,
 and exact platform/architecture Node locks. Each locked archive has an exact SHA-256 and contains
@@ -270,7 +270,7 @@ download begins; installation records and verifies the extracted binary hash.
 bundle for publication. The PhyAgentOS source and release packages do not
 bundle concrete Physical Execution Skills, Physical Execution nodes, models, or simulation assets; obtain only the Skills
 needed for a deployment and install them explicitly.
-The [integration development guide](docs/user_development_guide/README_en.md#5-package-publish-and-close-the-local-loop)
+The [Bundle and Tool integration reference](docs/user_development_guide/README.md#5-package-publish-and-close-the-local-loop)
 documents Bundle layout, local validation, immutable publication order, and Registry acceptance.
 
 </details>
@@ -289,9 +289,9 @@ documents Bundle layout, local validation, immutable publication order, and Regi
 | I want to… | Start here |
 | --- | --- |
 | Install, configure, and run PhyAgentOS | [User manual](docs/en/02-user-manual.md) |
-| Build a Skill or connect an environment | [Integration guide](docs/user_development_guide/README_en.md) |
+| Build a Skill or connect an environment | [TrackB development guide](docs/user_development_guide/track_b/README.md) |
 | Understand the Physical Execution API | [Physical Execution Tool API](docs/forge/README.md) |
-| Develop and test Core | [Developer manual](docs/en/03-developer-manual.md) |
+| Develop and test Core | [Core developer manual](docs/en/03-developer-manual.md) |
 | Inspect benchmark values and provenance | [Benchmark](docs/benchmarks.md) |
 | Browse all documentation | [Documentation index](docs/README.md) |
 

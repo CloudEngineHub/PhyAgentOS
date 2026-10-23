@@ -512,5 +512,5 @@ does not delete execution records or evolution history.
 ## Next reading
 
 - [Forge Configuration Reference](04-forge-configuration-reference.md)
-- [Operations Manual](../user_manual/README_en.md)
+- [Operations Manual](../user_manual/README.md)
 - [Forge Tool API Integration Contract](../forge/README.md)

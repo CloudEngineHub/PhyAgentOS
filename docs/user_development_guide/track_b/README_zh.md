@@ -4,7 +4,9 @@
 
 [整体架构](README_zh.md) · [仓库目录](REPOSITORIES_zh.md) · [公共协议](PROTOCOLS_zh.md) · [Runtime 关系](RUNTIME_zh.md) · [Skill 开发](SKILL_DEVELOPMENT_zh.md)
 
-[集成开发指南](../README.md) · [Piper X 完整示例](../PIPER_X_DEMO_zh.md) · [文档索引](../../README.md)
+[Bundle 与 Tool 接入参考](../README_zh.md) · [Piper X 完整示例](../PIPER_X_DEMO_zh.md) · [文档索引](../../README_zh.md)
+
+**平台开放范围：** 外部贡献提交及已有登记仓库修改暂未开放，需等待审批服务完成并开放。当前登记与发布由管理员维护；可先进行本地开发验证。下文的平台发布步骤以相关流程开放为前提，详见[贡献指南](../../../CONTRIBUTING_zh.md)。
 
 ## 1. 框架范围与阅读路径
 

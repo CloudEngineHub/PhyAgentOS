@@ -25,7 +25,7 @@
 | 理解 Skill、Tool、Endpoint 和 Gateway 的关系 | [Runtime 关系说明](docs/user_development_guide/track_b/RUNTIME_zh.md) |
 | 选择二次开发模式 | [Skill 开发手册](docs/user_development_guide/track_b/SKILL_DEVELOPMENT_zh.md) |
 | 复用现有节点接入仿真机器人 | [Piper X MuJoCo 示例](docs/user_development_guide/PIPER_X_DEMO_zh.md) |
-| 打包与集成 Skill | [集成开发指南](docs/user_development_guide/README.md) |
+| 查询 Bundle 字段与 Tool 接入细节 | [Bundle 与 Tool 接入参考](docs/user_development_guide/README_zh.md) |
 | 修改与测试 Core | [Core 开发者手册](docs/zh/03-developer-manual.md) |
 
 ## 建议优先参与的方向
