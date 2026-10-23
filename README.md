@@ -311,7 +311,7 @@ See the [full changelog](CHANGELOG.md).
 
 ## Contributing & community
 
-Contributions are welcome: report a bug, improve a Skill, add an environment integration, or help with documentation. Start with the [developer manual](docs/en/03-developer-manual.md) and open an [issue](https://github.com/PhyAgentOS/PhyAgentOS-core/issues) or pull request.
+Start with the [contribution guide](CONTRIBUTING.md) and the development manuals. We recommend focusing on TrackB Nodes, Skills and robot/environment integrations. External resource-platform submissions and changes to existing registered repositories are not yet open; they require completion and opening of the approval service. Local development and validation can proceed; see the guide for the current scope and source-review process.
 
 <details>
 <summary>Development checks</summary>
