@@ -279,6 +279,7 @@ paos skill stop robot-control-sim
 | Understand the Physical Execution API | [Physical Execution Tool API](docs/forge/README.md) |
 | Extend robot-control-sim to another arm | [Piper X development demo](docs/user_development_guide/PIPER_X_DEMO.md) |
 | Develop and test Core | [Core developer manual](docs/en/03-developer-manual.md) |
+| Inspect benchmark results and evaluation context | [Benchmark documentation](docs/benchmarks.md) |
 | Browse all documentation | [Documentation index](docs/README.md) |
 
 <a id="news"></a>

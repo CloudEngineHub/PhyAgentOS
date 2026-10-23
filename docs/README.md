@@ -19,6 +19,8 @@ External platform submissions and changes to existing registered repositories mu
 
 ## Focused manuals
 
+- [Benchmark documentation](benchmarks.md): results, time and token usage, and evaluation context.
+
 - [Governed Interaction Foundation](interaction/README.md): opt-in contracts, task governance, background monitoring, recovery gates and fake-world acceptance.
 
 - [Operations Manual](user_manual/README.md): preflight checklist, startup order, observation, cancellation, restart recovery, backup, and failure layers.

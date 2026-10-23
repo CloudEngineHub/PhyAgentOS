@@ -276,6 +276,7 @@ paos skill stop robot-control-sim
 | 了解 Physical Execution API | [Physical Execution Tool API](docs/forge/README_zh.md) |
 | 为 robot-control-sim 接入另一种机械臂 | [Piper X 二次开发 demo](docs/user_development_guide/PIPER_X_DEMO_zh.md) |
 | 开发与测试 Core | [Core 开发者手册](docs/zh/03-developer-manual.md) |
+| 查看测评结果与评测口径 | [Benchmark 文档](docs/benchmarks.md) |
 | 浏览全部文档 | [文档索引](docs/README_zh.md) |
 
 <a id="news"></a>

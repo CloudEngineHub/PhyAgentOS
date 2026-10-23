@@ -19,6 +19,8 @@
 
 ## 专题手册
 
+- [Benchmark 文档](benchmarks.md)：测评结果、耗时、Token 消耗与评测口径。
+
 - [Game 接入前通用交互基础](interaction/README_zh.md)：可选协议、真实任务治理、后台 Runner、恢复安全门及假环境验收。
 
 - [运行手册](user_manual/README_zh.md)：上线前检查、启动顺序、状态观测、取消、重启恢复、备份与故障分层。
