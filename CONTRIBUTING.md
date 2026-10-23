@@ -8,6 +8,19 @@ focus primarily on **TrackB: the Forge/Dora execution framework, Nodes and Skill
 This is the recommended starting point for extending robot and environment support; Core fixes and
 improvements are also welcome.
 
+## Current availability
+
+The resource platform does **not yet support external contributor submissions or external changes
+to existing registered repositories**. These workflows will become available only after the approval
+service is completed and opened for use. Current resource registration and publication are
+administrator-managed; they are not a public contributor submission route.
+
+For now, use this guide to prepare and validate development locally. References to platform
+submission, review and publication in the development manuals describe the workflow to follow once
+it becomes available, not an external service that is open today. GitHub source review follows each
+repository's maintainer rules separately; a fork or PR does not grant platform approval, repository
+write access or resource-publication rights.
+
 ## Start with the development manuals
 
 | Goal | Read first |
@@ -37,15 +50,16 @@ The [Skill development manual](docs/user_development_guide/track_b/SKILL_DEVELOP
 required skills and steps for each mode. Use the [Piper X demo](docs/user_development_guide/PIPER_X_DEMO.md)
 as a worked example, checking its version and model assumptions before adapting it.
 
-## Prepare and submit a contribution
+## Prepare development and future submissions
 
 1. Reproduce the baseline and record compatible Core, Forge, Dora, Skill and Node versions as relevant.
    For a new interface or a change spanning repositories, open an
    [issue](https://github.com/PhyAgentOS/PhyAgentOS-core/issues) to discuss the scope first.
-2. Use the repository catalog to locate the owning source repository. Submit Node changes there;
-   submit Core changes and Core documentation here. Keep each PR focused.
-3. Fork the owning repository and create a working branch in your fork. Open a PR against the agreed
-   target branch; check that target explicitly before submitting.
+2. Use the repository catalog to locate the owning source repository. Node changes belong to the
+   corresponding Node repository; Core changes and Core documentation belong here. Keep changes focused.
+3. Work in a local copy or a personal fork. If the owning repository's maintainers accept source PRs,
+   open one from your fork against the agreed target branch. This source-review process is separate
+   from the external platform submission and repository-change workflows that are not yet open.
 4. Run checks appropriate to the change. For robot integration, verify model/joint/frame consistency,
    startup, representative native Tool calls, failure handling and shutdown. Validate in simulation
    before attempting hardware execution. Explain the resulting behavior and any validation limits.
@@ -56,6 +70,8 @@ as a worked example, checking its version and model assumptions before adapting 
    [Node README checklist](docs/user_development_guide/track_b/SKILL_DEVELOPMENT.md).
 6. Preserve model/source licenses and immutable resource versions. Source changes that alter a Node
    artifact require a new version and matching Skill locks. Local installation, platform registration
-   and publication are separate steps; follow the target platform's documented workflow.
+   and publication are separate steps. External contributors must wait for the approval service and
+   these workflows to open before submitting resources or requesting changes to existing registered
+   repositories; then follow the platform's published instructions.
 
 Do not include credentials, private environment configuration or unrelated local logs in a contribution.
