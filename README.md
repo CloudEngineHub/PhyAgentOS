@@ -18,11 +18,10 @@
     <a href="#what">What</a> ·
     <a href="#why">Why</a> ·
     <a href="#release">v1.1.0</a> ·
-    <a href="#quick-start">Quick Start</a> ·
-    <a href="#quickstart-examples">Examples</a> ·
+    <a href="#quick-start">Install</a> ·
     <a href="#control-modes">Control Modes</a> ·
-    <a href="#benchmarks">Benchmark</a> ·
-    <a href="#robot-skills">Robot Skills</a> ·
+    <a href="#simulation-quickstart">Quickstart</a> ·
+    <a href="#quickstart-examples">Examples</a> ·
     <a href="#documentation">Documentation</a>
   </p>
   <p><a href="docs/news/gosim-shenzhen-2026.md"><b>GOSIM Shenzhen 2026 Spotlight · October 16–17 · Meet us in Shenzhen</b></a></p>
@@ -62,9 +61,9 @@
 See the [full changelog](CHANGELOG.md) and [changes since v1.0.0](https://github.com/PhyAgentOS/PhyAgentOS-core/compare/v1.0.0...v1.1.0).
 
 <a id="quick-start"></a>
-## Quickstart · How to get started
+## Install and configure
 
-Start with a model-backed CLI conversation, then connect a robot or simulator Skill below. **Prerequisites:** Python 3.11 or 3.12, Git, and an API key for your model provider.
+Start with a model-backed CLI conversation, then follow the [MuJoCo Quickstart](#simulation-quickstart) below. **Prerequisites:** Python 3.11 or 3.12, Git, and an API key for your model provider.
 
 ### 1. Install and initialize
 
@@ -163,7 +162,7 @@ paos agent
 
 You should receive a model response; `paos agent` opens an interactive conversation. This checks the core Agent and provider connection. Physical execution additionally needs a running Skill Runtime.
 
-Need another provider or deployment option? See the [user manual](docs/en/02-user-manual.md) · [Docker](docs/user_manual/DOCKER_en.md).
+Need another provider or deployment option? See the [user manual](docs/en/02-user-manual.md) · [Docker](docs/user_manual/DOCKER.md).
 
 <a id="control-modes"></a>
 ## One framework, three control modes
@@ -174,42 +173,18 @@ System 1 / System 2 follow the supplied figure’s naming for general-model cont
 
 These describe integration patterns; model and environment availability depends on the installed Physical Execution Skill. Core does not bundle model weights, simulator assets, or robot drivers.
 
-<a id="benchmarks"></a>
-## Benchmark
-
-Reported task success rates on **LIBERO-Long**, **RoboDojo**, and **RoboTwin**. Purple bars show PhyAgentOS (PAOS); muted bars show public-leaderboard references.
-
-**Evaluation scope:** LIBERO uses `libero-10` (labeled LIBERO-Long in the figures). RoboDojo and RoboTwin each use 10 randomly sampled tasks; sample counts vary for some models. Public-leaderboard references may use different protocols.
-
-![LIBERO-Long benchmark](docs/imgs/benchmark-libero-long-en.png)
-
-![RoboDojo benchmark](docs/imgs/benchmark-robodojo-en.png)
-
-![RoboTwin benchmark](docs/imgs/benchmark-robotwin-en.png)
-
-| PhyAgentOS configuration | LIBERO-10 ↑ | RoboDojo ↑ | RoboTwin ↑ |
-| --- | ---: | ---: | ---: |
-| GPT-6 + π0.5 | 100.00% | 23.30% | 76.70% |
-| DeepSeek 4.1 Flash + π0.5 | 97.22% | 26.70% | 77.80% |
-| GLM 5.3 Flash + π0.5 | 100.00% | 20.00% | 66.70% |
-| Gemini Robotic ER2 + π0.5 | — | — | 80.00% |
-| Kimi-K3 + π0.5 | — | — | 66.70% |
-| Gemini 3.8 Flash + π0.5 | — | — | 66.70% |
-| DeepSeek 4.1 Flash | 82.00% | 8.30% | — |
-| GPT-6 | — | 8.30% | — |
-| GLM 5.3 Flash | — | 2.78% | — |
-| Kimi-K3 | 60.00% | 0.00% | — |
-
-> English translations of the latest maintainer-supplied figures. See [full results, time and token usage, and evaluation context](docs/benchmarks.md). “—” means not reported. To reproduce the LIBERO evaluation, follow the [LIBERO quickstart](example/quickstart/libero-quickstart.md).
-
 <a id="robot-skills"></a>
-## Connect a robot or simulator
+<a id="simulation-quickstart"></a>
+## Quickstart · Control a robot in MuJoCo
 
-A **Physical Execution Skill** packages a workflow and its runtime requirements. Install the Skill for your environment, start one of its named profiles, then ask the Agent to use it.
+Use **`robot-control-sim`** to control a simulated Piper arm through joint targets or
+end-effector poses. Complete the installation and model configuration above first.
+The prebuilt simulation Nodes used here target **Linux x86_64** and require a working
+graphical display or virtual display for MuJoCo and the image viewer.
 
-**1. Install Dora for managed runtimes**
+### 1. Install Dora
 
-v1.1.0 retains the Dora CLI **0.4.1** (`dora-message` **0.7.0**) compatibility baseline. On Linux/macOS:
+v1.1.0 retains the Dora CLI **0.4.1** (`dora-message` **0.7.0**) compatibility baseline:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
@@ -217,66 +192,77 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 dora --version
 ```
 
-Dora is needed for `paos skill start`; the CLI conversation above does not require it. [Windows and Cargo instructions](docs/en/02-user-manual.md#dora-cli-for-managed-skill-profiles).
+Dora is required to start the simulation Runtime. See the [Dora installation reference](docs/en/02-user-manual.md#dora-cli-for-managed-skill-profiles) for other installation methods.
 
-**2. Find and install a Skill**
+### 2. Install robot-control-sim
 
-For registry downloads, set `resourceRegistry.url` in your config or export `PAOS_RESOURCE_REGISTRY_URL` to the registry supplied by your deployment. Then run:
-
-```bash
-paos skill search
-paos skill install <skill-name> --version <version>
-paos skill inspect <skill-name>
-```
-
-Replace `<skill-name>` and `<version>` with a search result. For an independently obtained local bundle:
+Set `resourceRegistry.url` in your config, or `PAOS_RESOURCE_REGISTRY_URL`, to a deployment
+that provides `robot-control-sim` and its locked Node artifacts. Then run:
 
 ```bash
-paos skill install /path/to/skill-bundle.tar.gz --local
+paos skill search robot-control-sim
+paos skill install robot-control-sim
+paos skill inspect robot-control-sim
 ```
 
-**3. Start the runtime and submit a task**
+`inspect` shows the installed version, profiles and dependencies. This example uses
+`mujoco-piper`; `mujoco-franka` and `mujoco-so101` select other robots. For a separately
+obtained Bundle, use `paos skill install /path/to/robot-control-sim.tar.gz --local`;
+its locked Nodes must also be available. Core does not bundle these simulation assets.
 
-Replace `<profile>` with a profile declared by the installed Skill; follow its setup instructions for models, assets, and hardware.
+### 3. Start the simulation
 
 ```bash
-paos skill start <skill-name> --profile <profile>
-paos skill status <skill-name>
-paos agent -m "Inspect the active Skill and Physical Execution capabilities, then report which tasks are available."
+paos skill start robot-control-sim --profile mujoco-piper
+paos skill status robot-control-sim
 ```
 
-Once the runtime is healthy, describe a task supported by that Skill in `paos agent`. Starting the Agent does not automatically download or start a runtime.
+Wait for the Runtime to report healthy and the simulation camera viewer to open. If startup
+fails, inspect `paos skill logs robot-control-sim` before sending a motion request.
 
-<details>
-<summary>Useful runtime commands</summary>
+### 4. Control joints and the end effector
+
+The Agent first reads `sim.get_robot_info` and live Tool context to determine joints, limits,
+frames and units. It then uses the active Skill's workflow to execute and reconcile the motion.
+
+| Control mode | Tool | Target |
+| --- | --- | --- |
+| Joint targets | `sim.set_joint_positions` | Absolute arm joint positions in radians |
+| End-effector pose | `sim.move_eef` | Absolute position in meters and quaternion orientation; the motion server solves IK |
+
+The Agent converts relative requests into absolute Tool targets using the current state.
+Try a joint-space request:
 
 ```bash
-paos skill list
-paos skill logs <skill-name>
-paos skill stop <skill-name>
-paos gateway
+paos agent -m "Use robot-control-sim in MuJoCo. Read the current arm joints and limits, move the first arm joint by +0.1 rad within its limits, wait for completion, and report the final joints."
 ```
 
-`paos gateway` runs configured message channels and background services. For readiness checks and troubleshooting, see the [operations guide](docs/user_manual/README_en.md).
+Then try a Cartesian request:
 
-Each Physical Execution Skill bundle declares its workflow document, required Tool IDs, named runtime profiles,
-and exact platform/architecture Node locks. Each locked archive has an exact SHA-256 and contains
-either one named root-level executable (`executable_tar_gz`) or one root directory named after the
-entrypoint that holds the executable and its runtime tree (`directory_tar_gz`). For Registry Node
-downloads, the verified Skill lock supplies the
-digest when the Registry omits that duplicate field, and the exact size is resolved before the
-download begins; installation records and verifies the extracted binary hash.
-`python scripts/package_skill.py <bundle-dir> --output-dir <directory>` creates a deterministic
-bundle for publication. The PhyAgentOS source and release packages do not
-bundle concrete Physical Execution Skills, Physical Execution nodes, models, or simulation assets; obtain only the Skills
-needed for a deployment and install them explicitly.
-The [integration development guide](docs/user_development_guide/README_en.md#5-package-publish-and-close-the-local-loop)
-documents Bundle layout, local validation, immutable publication order, and Registry acceptance.
+```bash
+paos agent -m "Use robot-control-sim in MuJoCo. Read the current TCP pose and frame, plan a target 1 cm higher along the base-frame Z axis while keeping its orientation, execute it if reachable, and report the final pose or planning failure."
+```
 
-</details>
+You can also run `paos agent` for interactive control. Motion should be visible in the simulation;
+read the returned execution result and final state rather than treating admission as completion.
+
+### 5. Stop the simulation
+
+After the motion task has finished:
+
+```bash
+paos skill stop robot-control-sim
+```
+
+### Extend this example
+
+- [TrackB framework guide](docs/user_development_guide/track_b/README.md): architecture, repository catalog and Node protocols.
+- [Skill development manual](docs/user_development_guide/track_b/SKILL_DEVELOPMENT.md): configure a profile, add a profile, or develop Nodes and assemble a Skill.
+- [Piper X development demo](docs/user_development_guide/PIPER_X_DEMO.md): adapt `robot-control-sim` to another arm, including model conversion and both control modes.
+- [Bundle and Tool integration reference](docs/user_development_guide/README.md): manifest fields, packaging and local installation.
 
 <a id="quickstart-examples"></a>
-## Quickstart examples
+## More examples
 
 | Platform | Coverage | Guide |
 | --- | --- | --- |
@@ -289,10 +275,10 @@ documents Bundle layout, local validation, immutable publication order, and Regi
 | I want to… | Start here |
 | --- | --- |
 | Install, configure, and run PhyAgentOS | [User manual](docs/en/02-user-manual.md) |
-| Build a Skill or connect an environment | [Integration guide](docs/user_development_guide/README_en.md) |
+| Build a Skill or connect an environment | [TrackB development guide](docs/user_development_guide/track_b/README.md) |
 | Understand the Physical Execution API | [Physical Execution Tool API](docs/forge/README.md) |
-| Develop and test Core | [Developer manual](docs/en/03-developer-manual.md) |
-| Inspect benchmark values and provenance | [Benchmark](docs/benchmarks.md) |
+| Extend robot-control-sim to another arm | [Piper X development demo](docs/user_development_guide/PIPER_X_DEMO.md) |
+| Develop and test Core | [Core developer manual](docs/en/03-developer-manual.md) |
 | Browse all documentation | [Documentation index](docs/README.md) |
 
 <a id="news"></a>

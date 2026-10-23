@@ -7,6 +7,8 @@
 Choose among three extension modes based on whether compatible Nodes already implement the target capability,
 then decide whether binaries must be rebuilt. The executable model/profile example is [PIPER_X_DEMO.md](../PIPER_X_DEMO.md).
 
+**Platform availability:** External resource submissions and changes to existing registered repositories are not yet open. They must wait for the approval service to be completed and opened. Current registration/publication is administrator-managed. Local development and validation can proceed; platform publication steps below are conditional on that workflow becoming available. See the [contribution guide](../../../CONTRIBUTING.md).
+
 ## 1. Three development modes and difficulty
 
 | Mode | Typical goal | Main changes | Node artifacts | Difficulty and skills |
@@ -284,4 +286,4 @@ Rollback restores previous immutable artifacts/locks without overwriting version
 
 - [Piper X tutorial](../PIPER_X_DEMO.md): official model, profile, native joint/EEF Actions and stop commands.
 - [Runtime relationships](RUNTIME.md): five Tools, three Endpoints/providers and nine Nodes in robot-control-sim.
-- [Integration development guide](../README_en.md): manifest, ToolSpec, task binding and common validation contracts.
+- [Bundle and Tool integration reference](../README.md): manifest, ToolSpec, task binding and common validation contracts.

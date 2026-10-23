@@ -173,6 +173,6 @@ outside the implemented contract.
 ## Next reading
 
 - [User Manual](02-user-manual.md)
-- [Developer Manual](03-developer-manual.md)
+- [Core Developer Manual](03-developer-manual.md)
 - [Forge Tool API Integration Contract](../forge/README.md)
 - [Agent Experience and Skill Evolution](05-agent-experience-and-skill-evolution.md)

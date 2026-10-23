@@ -30,7 +30,7 @@ write access or resource-publication rights.
 | Understand Skill, Tool, Endpoint and Gateway relationships | [Runtime guide](docs/user_development_guide/track_b/RUNTIME.md) |
 | Choose an extension mode | [Skill development manual](docs/user_development_guide/track_b/SKILL_DEVELOPMENT.md) |
 | Adapt a simulated robot using existing Nodes | [Piper X MuJoCo demo](docs/user_development_guide/PIPER_X_DEMO.md) |
-| Package and integrate a Skill | [Integration development guide](docs/user_development_guide/README_en.md) |
+| Reference Bundle fields and Tool integration | [Bundle and Tool integration reference](docs/user_development_guide/README.md) |
 | Change and test Core | [Core developer manual](docs/en/03-developer-manual.md) |
 
 ## Recommended contribution areas

@@ -1,6 +1,6 @@
 # PhyAgentOS 用户手册
 
-[English](../en/02-user-manual.md) · [文档索引](../README.md)
+[English](../en/02-user-manual.md) · [文档索引](../README_zh.md)
 
 > 文档版本：1.0.0。
 
@@ -173,7 +173,7 @@ Custom endpoint 或 Azure 部署别名的能力未知时应使用 `none`；显�
 从 `minimal / low / medium / high / xhigh / max` 中仅展示支持的档位。
 额外档位需要本地目录明确支持且适配器可映射；网关可选档位可能与原厂接口不同。
 支持 `max` 的自适应 Claude 使用 `output_config.effort`，传统 Claude 使用思考预算。
-`none` 始终表示模型默认行为，不代表关闭思考。详见[推理强度](reasoning-effort.md)。
+`none` 始终表示模型默认行为，不代表关闭思考。详见[Provider、模型与推理强度配置](#2-配置模型与-forge)。
 
 **Requesty 的推理强度限制：** 当前 PAOS 的 Requesty 接入尚不支持显式推理强度档位。
 即使所选模型本身支持推理，`high` 等覆盖值仍会被 PAOS 的本地能力校验拒绝，请求不会发送到
@@ -479,5 +479,5 @@ evidence。Evolution fail-open，反思错误不会改变执行或验证。
 ## 后续阅读
 
 - [Forge 配置参考](04-forge-configuration-reference.md)
-- [运行手册](../user_manual/README.md)
+- [运行手册](../user_manual/README_zh.md)
 - [Forge Tool API 接入契约](../forge/README_zh.md)

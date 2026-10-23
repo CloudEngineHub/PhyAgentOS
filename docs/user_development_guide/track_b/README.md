@@ -4,7 +4,9 @@
 
 [Overview](README.md) · [Repositories](REPOSITORIES.md) · [Protocols](PROTOCOLS.md) · [Runtime](RUNTIME.md) · [Skill development](SKILL_DEVELOPMENT.md)
 
-[Integration development guide](../README_en.md) · [Piper X tutorial](../PIPER_X_DEMO.md) · [Documentation index](../../README.md)
+[Bundle and Tool integration reference](../README.md) · [Piper X tutorial](../PIPER_X_DEMO.md) · [Documentation index](../../README.md)
+
+**Platform availability:** External resource submissions and changes to existing registered repositories are not yet open. They must wait for the approval service to be completed and opened. Current registration/publication is administrator-managed. Local development and validation can proceed; platform publication steps below are conditional on that workflow becoming available. See the [contribution guide](../../../CONTRIBUTING.md).
 
 ## 1. Scope and reading path
 
