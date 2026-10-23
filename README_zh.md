@@ -19,7 +19,6 @@
     <a href="#why">Why</a> ·
     <a href="#release">v1.1.0</a> ·
     <a href="#quick-start">安装配置</a> ·
-    <a href="#control-modes">控制方式</a> ·
     <a href="#simulation-quickstart">仿真 Quickstart</a> ·
     <a href="#quickstart-examples">快速启动示例</a> ·
     <a href="#documentation">文档导航</a>
@@ -79,7 +78,6 @@ paos onboard
 Windows PowerShell 请将激活命令替换为 `.venv\Scripts\Activate.ps1`。
 
 ### 2. 配置模型
-
 
 通过隐藏输入配置密钥，再选择默认 Provider：
 
@@ -163,18 +161,13 @@ paos agent
 
 其他模型服务与部署方式见 [用户手册](docs/zh/02-user-manual.md) · [Docker 部署](docs/user_manual/DOCKER_zh.md).
 
-<a id="control-modes"></a>
-## 一套执行框架，三种控制方式
-
-![通用模型、混合控制与动作模型通过 PhyAgentOS 执行动作](docs/imgs/control-modes-original.jpg)
-
-图中的 System 1 / System 2 沿用所提供原图的命名，分别指通用模型控制与动作模型控制。
-
-以上描述的是接入方式；具体模型与环境取决于安装的 Physical Execution Skill。Core 不捆绑模型权重、仿真资源或机器人驱动。
-
 <a id="robot-skills"></a>
 <a id="simulation-quickstart"></a>
 ## Quickstart · 在 MuJoCo 中操控机器人
+
+> [!TIP]
+> **开发者接入自己的机械臂：直接查看 [Piper X 完整二次开发 demo](docs/user_development_guide/PIPER_X_DEMO_zh.md)。**
+> 从模型转换到 Skill 组装，跑通关节与末端位姿控制；配合 [Skill 开发手册](docs/user_development_guide/track_b/SKILL_DEVELOPMENT_zh.md)，选择配置修改、新增 profile 或独立 Node 开发。
 
 以 **`robot-control-sim`** 为例，通过关节目标或末端位姿控制仿真 Piper 机械臂。
 请先完成上方安装与模型配置。本例使用的预构建仿真 Node 面向 **Linux x86_64**，
@@ -218,27 +211,50 @@ paos skill status robot-control-sim
 等待 Runtime 报告健康并打开仿真相机查看器。启动失败时，先通过
 `paos skill logs robot-control-sim` 定位问题，再提交运动请求。
 
+![robot-control-sim 在 MuJoCo 中启动的实录](docs/imgs/quickstart/robot-control-sim-startup.gif)
+
 ### 4. 按关节目标和末端位姿控制
 
-Agent 先读取 `sim.get_robot_info` 与实时 Tool context，确认关节、限位、坐标系和单位，
-再按活动 Skill 的工作流执行运动并核对结果。
+Agent 读取 `sim.get_robot_info` 与实时 Tool context，确认关节、限位、坐标系和单位，
+再按活动 Skill 的工作流执行。下方绝对目标适用于 `mujoco-piper`（`arm_base` / `tcp`）；
+切换 profile 时应使用对应机器人的坐标系和可达目标。
 
 | 控制方式 | Tool | 目标 |
 | --- | --- | --- |
 | 关节目标 | `sim.set_joint_positions` | 机械臂各关节的绝对位置，单位为弧度 |
 | 末端位姿 | `sim.move_eef` | 以米表示的绝对位置及四元数姿态，由 motion server 求解 IK |
 
-Agent 根据当前状态将相对运动请求转换成 Tool 所需的绝对目标。先尝试关节空间请求：
+运动演示使用 `verification.mode=off`，按 Tool 执行结果判断完成；语义任务验证与证据策略见 [Core 开发者手册](docs/zh/03-developer-manual.md#7-verification-与-recovery)。
+
+先尝试关节空间请求：
 
 ```bash
-paos agent -m "使用 robot-control-sim 在 MuJoCo 中控制机械臂。读取当前关节与限位，将第一个机械臂关节在限位内增加 0.1 rad，等待运动完成并报告最终关节位置。"
+paos agent -m "使用 robot-control-sim 的 mujoco-piper。 \
+  检查机器人信息和 Tool context，本次运动演示使用 verification.mode=off。 \
+  通过 sim.set_joint_positions 将 joint1-joint6 移动到 [0.35, 0.55, -0.9, 0.15, 0.25, -0.1] rad， \
+  velocity_scale 和 acceleration_scale 均为 0.2。 \
+  读取动作结果、finalize 任务并简要报告。 \
+  不修改文件、不使用 shell 工具；失败时直接报告。"
 ```
+
+![输入关节目标命令后的 Piper 仿真运动实录](docs/imgs/quickstart/robot-control-sim-joint-control.gif)
 
 再尝试末端位姿请求：
 
 ```bash
-paos agent -m "使用 robot-control-sim 在 MuJoCo 中控制机械臂。读取当前 TCP 位姿与坐标系，规划沿基座坐标系 Z 轴上移 1 厘米且保持姿态的目标；可达时执行，并报告最终位姿或规划失败。"
+paos agent -m "使用 robot-control-sim 的 mujoco-piper。 \
+  检查 Tool context，本次运动演示使用 verification.mode=off。 \
+  调用 sim.move_eef，将 TCP 移到 arm_base 下的位置 (0.284045, 0.007878, 0.478706) m， \
+  四元数 xyzw 为 (-0.002904, 0.693239, 0.008319, 0.720654)， \
+  position_tolerance_m=0.01、orientation_tolerance_rad=0.05， \
+  velocity_scale 和 acceleration_scale 均为 0.2。 \
+  由 motion server 求解 IK；读取动作结果、finalize 任务并简要报告。 \
+  不修改文件、不使用 shell 工具；失败时直接报告。"
 ```
+
+![输入末端位姿命令后的 Piper 仿真运动实录](docs/imgs/quickstart/robot-control-sim-eef-control.gif)
+
+*以上为命令与 MuJoCo 仿真的运行实录，命令画面固定保留以便阅读，并已缩短模型等待停顿。*
 
 也可运行 `paos agent` 进入交互控制。应能在仿真中观察到运动；以返回的执行结果和最终状态为准，
 不把请求已接纳当作动作已完成。

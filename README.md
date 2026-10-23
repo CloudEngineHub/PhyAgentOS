@@ -19,7 +19,6 @@
     <a href="#why">Why</a> ·
     <a href="#release">v1.1.0</a> ·
     <a href="#quick-start">Install</a> ·
-    <a href="#control-modes">Control Modes</a> ·
     <a href="#simulation-quickstart">Quickstart</a> ·
     <a href="#quickstart-examples">Examples</a> ·
     <a href="#documentation">Documentation</a>
@@ -79,7 +78,6 @@ paos onboard
 On Windows PowerShell, replace the activation command with `.venv\Scripts\Activate.ps1`.
 
 ### 2. Connect a model
-
 
 Configure credentials with hidden input, then select the default:
 
@@ -164,18 +162,13 @@ You should receive a model response; `paos agent` opens an interactive conversat
 
 Need another provider or deployment option? See the [user manual](docs/en/02-user-manual.md) · [Docker](docs/user_manual/DOCKER.md).
 
-<a id="control-modes"></a>
-## One framework, three control modes
-
-![General, hybrid, and action-model control through PhyAgentOS](docs/imgs/control-modes-en.png)
-
-System 1 / System 2 follow the supplied figure’s naming for general-model control and action-model control, respectively.
-
-These describe integration patterns; model and environment availability depends on the installed Physical Execution Skill. Core does not bundle model weights, simulator assets, or robot drivers.
-
 <a id="robot-skills"></a>
 <a id="simulation-quickstart"></a>
 ## Quickstart · Control a robot in MuJoCo
+
+> [!TIP]
+> **Developers: bring your own robot — [Piper X customization demo](docs/user_development_guide/PIPER_X_DEMO.md).**
+> Follow the complete model-to-Skill example for joint and end-effector control. Use the [Skill development manual](docs/user_development_guide/track_b/SKILL_DEVELOPMENT.md) to choose between configuration changes, a new profile and Node development.
 
 Use **`robot-control-sim`** to control a simulated Piper arm through joint targets or
 end-effector poses. Complete the installation and model configuration above first.
@@ -220,28 +213,47 @@ paos skill status robot-control-sim
 Wait for the Runtime to report healthy and the simulation camera viewer to open. If startup
 fails, inspect `paos skill logs robot-control-sim` before sending a motion request.
 
+![Live robot-control-sim startup in MuJoCo](docs/imgs/quickstart/robot-control-sim-startup.gif)
+
 ### 4. Control joints and the end effector
 
-The Agent first reads `sim.get_robot_info` and live Tool context to determine joints, limits,
-frames and units. It then uses the active Skill's workflow to execute and reconcile the motion.
+The Agent reads `sim.get_robot_info` and live Tool context to determine joints, limits, frames
+and units, then follows the active Skill workflow. The absolute targets below are for
+`mujoco-piper` (`arm_base` / `tcp`); use the selected robot's frames and reachable targets when switching profiles.
 
 | Control mode | Tool | Target |
 | --- | --- | --- |
 | Joint targets | `sim.set_joint_positions` | Absolute arm joint positions in radians |
 | End-effector pose | `sim.move_eef` | Absolute position in meters and quaternion orientation; the motion server solves IK |
 
-The Agent converts relative requests into absolute Tool targets using the current state.
+These motion demos use `verification.mode=off`, so success is derived from Tool execution results. For semantic task verification and evidence policies, see the [Core developer manual](docs/en/03-developer-manual.md#7-verification-and-recovery).
+
 Try a joint-space request:
 
 ```bash
-paos agent -m "Use robot-control-sim in MuJoCo. Read the current arm joints and limits, move the first arm joint by +0.1 rad within its limits, wait for completion, and report the final joints."
+paos agent -m "Use robot-control-sim (mujoco-piper). Inspect robot info and Tool context. For this \
+  motion demo use verification.mode=off. Move joint1-joint6 to [0.35, 0.55, -0.9, 0.15, \
+  0.25, -0.1] rad via sim.set_joint_positions, with velocity_scale=0.2 and \
+  acceleration_scale=0.2. Read the action result, finalize the task and report briefly. Do \
+  not edit files or use shell tools; report any failure."
 ```
+
+![A joint-target command followed by live Piper motion](docs/imgs/quickstart/robot-control-sim-joint-control.gif)
 
 Then try a Cartesian request:
 
 ```bash
-paos agent -m "Use robot-control-sim in MuJoCo. Read the current TCP pose and frame, plan a target 1 cm higher along the base-frame Z axis while keeping its orientation, execute it if reachable, and report the final pose or planning failure."
+paos agent -m "Use robot-control-sim (mujoco-piper). Inspect Tool context. For this motion demo use \
+  verification.mode=off. Call sim.move_eef for TCP in arm_base: position (0.284045, \
+  0.007878, 0.478706) m, quaternion xyzw (-0.002904, 0.693239, 0.008319, 0.720654), \
+  position_tolerance_m=0.01, orientation_tolerance_rad=0.05, velocity_scale=0.2, \
+  acceleration_scale=0.2. Let the motion server solve IK. Read the action result, finalize \
+  the task and report briefly. Do not edit files or use shell tools; report any failure."
 ```
+
+![An end-effector pose command followed by live Piper motion](docs/imgs/quickstart/robot-control-sim-eef-control.gif)
+
+*Live recordings of the command and MuJoCo simulation; the captured command panel is held visible and model-wait pauses are shortened.*
 
 You can also run `paos agent` for interactive control. Motion should be visible in the simulation;
 read the returned execution result and final state rather than treating admission as completion.
