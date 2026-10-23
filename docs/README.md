@@ -27,6 +27,9 @@ The PhyAgentOS team maintains this directory for users, operators, and ecosystem
 - [通信架构](user_development_guide/COMMUNICATION.md)：Agent 消息、Forge HTTP/WebSocket、system event、SQLite 与 Artifact 边界。
 - [Forge Tool API 接入契约](forge/README_zh.md)：Query/Action/Session、不可变 Skill binding、ToolInvocation、AgentTask、证据、验证、恢复和 Skill Runtime 契约。
 
+- [TrackB 框架说明](user_development_guide/track_b/README_zh.md)：整体架构、仓库目录、公共协议、Runtime 关系和三种 Skill 开发模式。
+- [Piper X 二次开发 demo](user_development_guide/PIPER_X_DEMO_zh.md)：复用原 pipeline 接入新机械臂。
+
 ### 推荐阅读路径
 
 | 目标 | 建议路径 |
@@ -59,6 +62,9 @@ The PhyAgentOS team maintains this directory for users, operators, and ecosystem
 - [Integration Development Guide](user_development_guide/README_en.md): Tool, Node, and Skill integration; Bundle packaging and immutable publication; the local loop; evidence sources; providers; and PAOS extension boundaries.
 - [Communication Architecture](user_development_guide/COMMUNICATION_en.md): Agent messages, Forge HTTP/WebSocket, system events, SQLite, and artifact boundaries.
 - [Forge Tool API Integration Contract](forge/README.md): Query/Action/Session, immutable Skill binding, ToolInvocation, AgentTask, evidence, verification, recovery, and Skill Runtime contracts.
+
+- [TrackB framework guide](user_development_guide/track_b/README.md).
+- [Piper X development demo](user_development_guide/PIPER_X_DEMO.md).
 
 ### Suggested reading paths
 

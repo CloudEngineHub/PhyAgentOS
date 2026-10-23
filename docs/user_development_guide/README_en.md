@@ -315,3 +315,15 @@ Bundle, node digests, profile, and environment used.
 - [Developer Manual](../en/03-developer-manual.md)
 - [Communication Architecture](COMMUNICATION_en.md)
 - [Forge Tool API Contract](../forge/README.md)
+
+## TrackB framework and Skill development
+
+- Start with the [Piper X MuJoCo Skill development demo](PIPER_X_DEMO.md) for a new
+  simulated arm supported by existing Nodes. It includes portable scripts, both joint/Cartesian
+  control modes and a checklist for adapting another robot.
+- Use the [TrackB framework guide](track_b/README.md)
+  for architecture, categorized repositories, protocols and the concrete Runtime relationship.
+- The [TrackB Skill development guide](track_b/SKILL_DEVELOPMENT.md) separates changes
+  within a profile, adding a profile, and independent Node development. Local packaging/install,
+  platform registration, review and publication are separate stages; use the registration
+  workflow documented by the target platform version.
