@@ -306,7 +306,7 @@ PhyAgentOS 源码与发布包不内置具体 Physical Execution Skill、Physical
 
 ## 参与贡献与社区
 
-欢迎报告问题、改进 Skill、接入新环境或完善文档。请先阅读[开发者手册](docs/zh/03-developer-manual.md)，再提交 [Issue](https://github.com/PhyAgentOS/PhyAgentOS-core/issues) 或 Pull Request。
+欢迎报告问题、改进 Skill、接入新环境或完善文档。请先阅读[贡献指南](CONTRIBUTING_zh.md)与开发手册，建议优先参与 TrackB 的 Node、Skill 和机器人/环境接入开发，再通过 [Issue](https://github.com/PhyAgentOS/PhyAgentOS-core/issues) 或 Pull Request 提交贡献。
 
 <details>
 <summary>开发检查命令</summary>
