@@ -5,7 +5,8 @@
 [Bundle and Tool integration reference](README.md) · [TrackB framework](track_b/README.md) · [Three development modes](track_b/SKILL_DEVELOPMENT.md) · [Example code](../../example/robot-control-sim-piper-x/README.md)
 
 > A reusable extension tutorial for MuJoCo simulation, joint targets and end-effector poses.
-> Runtime baseline: Core v1.1.0, Dora CLI 0.4.1, original robot-control-sim 0.1.2 Node locks.
+> Documentation target: Core v1.1.1. Recorded runtime baseline: Core v1.1.0, Dora CLI 0.4.1, original robot-control-sim 0.1.2 Node locks.
+> The recorded robot validation below has not been rerun for v1.1.1.
 > Companion scripts build/validate a derived Skill without upgrading its locked Nodes.
 
 **Platform availability:** External resource submissions and changes to existing registered repositories are not yet open. They must wait for the approval service to be completed and opened. Current registration/publication is administrator-managed. Local development and validation can proceed; platform publication steps below are conditional on that workflow becoming available. See the [contribution guide](../../CONTRIBUTING.md).
@@ -38,7 +39,7 @@ publication still follows the destination platform's process.
 
 ## 2. Prepare the environment and upstream Skill
 
-Use Linux x86_64, Python 3.12, Git, Dora CLI 0.4.1 and a Core v1.1.0 CLI environment.
+Use Linux x86_64, Python 3.12, Git, Dora CLI 0.4.1 and a Core v1.1.1 CLI environment; reproducing the original recorded validation requires Core v1.1.0.
 Keep Core and model-building environments separate so MuJoCo/numpy do not modify Core dependencies.
 See the [Core user manual](../en/02-user-manual.md) for installation, then check:
 
@@ -49,7 +50,7 @@ paos skill install robot-control-sim --version 0.1.2
 paos skill inspect robot-control-sim
 ```
 
-In this Core v1.1.0 baseline, Registry `--version` constrains downloaded content rather than querying historical versions.
+In Core v1.1.1, as in the recorded v1.1.0 baseline, Registry `--version` constrains downloaded content rather than querying historical versions.
 If the current Registry has advanced, use a retained official immutable URL or local 0.1.2 archive:
 
 ```bash

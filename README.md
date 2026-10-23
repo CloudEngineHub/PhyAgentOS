@@ -10,20 +10,20 @@
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-4264ce" alt="MIT License"></a>
     <img src="https://img.shields.io/badge/Python-3.11%2B-4264ce?logo=python&amp;logoColor=white" alt="Python 3.11 or newer">
-    <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Release-v1.1.0-4264ce" alt="Release v1.1.0"></a>
+    <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Release-v1.1.1-4264ce" alt="Release v1.1.1"></a>
     <a href="https://github.com/PhyAgentOS/PhyAgentOS-core/stargazers"><img src="https://img.shields.io/github/stars/PhyAgentOS/PhyAgentOS-core?style=flat&amp;color=4264ce" alt="GitHub stars"></a>
   </p>
   <p><a href="README.md">English</a> · <a href="README_zh.md">简体中文</a></p>
   <p>
     <a href="#what">What</a> ·
     <a href="#why">Why</a> ·
-    <a href="#release">v1.1.0</a> ·
+    <a href="#release">v1.1.1</a> ·
     <a href="#quick-start">Install</a> ·
     <a href="#simulation-quickstart">Quickstart</a> ·
     <a href="#quickstart-examples">Examples</a> ·
     <a href="#documentation">Documentation</a>
   </p>
-  <p><a href="docs/news/gosim-shenzhen-2026.md"><b>GOSIM Shenzhen 2026 Spotlight · October 16–17 · Meet us in Shenzhen</b></a></p>
+  <p><a href="#release"><b>v1.1.1 · Skill development, execution reliability and the Opper gateway</b></a></p>
 </div>
 
 ---
@@ -46,18 +46,17 @@
 | **Reusable physical capabilities** | Package environment-specific tools and runtimes as versioned Skills, keeping cognitive planning separate from robot integration. |
 
 <a id="release"></a>
-## What's new in v1.1.0
+## What's new in v1.1.1
 
-**Provider management, Skill Runtime and governed interactions.** This release adds:
+**Skill development, execution reliability and the Opper gateway.** Changes since v1.1.0:
 
-- **Provider management:** centralized configuration, connection tests, authentication, model discovery, saved model selection, and per-session overrides.
-- **More model connections:** direct OpenAI Responses API support for tools, multimodal input, reasoning effort, and Forge verification; Requesty, Cheaper Inference, and API Route gateways.
-- **Skill Runtime updates:** `directory_tar_gz` Node packages with bundled dependencies and validated internal relative symbolic links; profile startup timeouts, `required_tools` overrides, and startup-hook context for LIBERO 0.3.4.
-- **Governed interaction foundation (opt-in):** connect AgentTask and Session to multi-step decisions, independent root verification, and one deduplicated experience episode through frozen bindings, a persistent Runner, and a Supervisor. See [scope and enablement](docs/interaction/README.md).
-- **Reliability improvements:** preserve valid cron jobs, handle Dora status and profile environments, improve archive and image-path handling, and retain conversation history on model failures. Cancellation blocks new execution intents, late decisions are discarded, and uncertain operations retain guards until reconciliation without automatic retransmission.
-- **Guides and validation:** expanded regression and build checks, bilingual documentation, Piper and LIBERO-10 quickstarts, and clearer benchmark scope and results.
+- **Opper gateway:** OpenAI-compatible routing with provider selection, environment credentials and unchanged model identifiers.
+- **Local Skill development:** locally edited workflow documents and Node executables can run with warnings, while bindings and experience retain the activated workflow hash. Explicit Node verification and install-cache acceptance remain strict.
+- **Action rejection handling:** structured pre-dispatch Gateway rejections are recorded as failed and do not block a later retry or successful task finalization. Timeouts and uncertain remote execution retain their existing guards.
+- **Piper X development example:** bilingual Track B guides and an independent simulation Skill example cover model conversion, original Node locks, packaging and recorded validation. See the [Piper X guide](docs/user_development_guide/PIPER_X_DEMO.md) for its original runtime baseline.
+- **Clearer documentation:** consolidated bilingual manuals and contribution guidance, a MuJoCo Quickstart with live GIFs, and retained benchmark documentation links.
 
-See the [full changelog](CHANGELOG.md) and [changes since v1.0.0](https://github.com/PhyAgentOS/PhyAgentOS-core/compare/v1.0.0...v1.1.0).
+See the [full changelog](CHANGELOG.md) and [changes since v1.1.0](https://github.com/PhyAgentOS/PhyAgentOS-core/compare/v1.1.0...v1.1.1).
 
 <a id="quick-start"></a>
 ## Install and configure
@@ -67,7 +66,7 @@ Start with a model-backed CLI conversation, then follow the [MuJoCo Quickstart](
 ### 1. Install and initialize
 
 ```bash
-git clone --branch v1.1.0 https://github.com/PhyAgentOS/PhyAgentOS-core.git
+git clone --branch v1.1.1 https://github.com/PhyAgentOS/PhyAgentOS-core.git
 cd PhyAgentOS-core
 python -m venv .venv
 source .venv/bin/activate
@@ -91,7 +90,7 @@ Docker/secret input, process overrides and session commands (`/provider`, `/mode
 Session switches affect subsequent turns only and leave running tasks and other sessions unchanged.
 
 <details>
-<summary>Full configuration reference (v1.1.0)</summary>
+<summary>Full configuration reference (v1.1.1)</summary>
 
 The configuration file is serialized in camelCase; snake_case keys are also accepted.
 
@@ -177,7 +176,7 @@ graphical display or virtual display for MuJoCo and the image viewer.
 
 ### 1. Install Dora
 
-v1.1.0 retains the Dora CLI **0.4.1** (`dora-message` **0.7.0**) compatibility baseline:
+v1.1.1 retains the Dora CLI **0.4.1** (`dora-message` **0.7.0**) compatibility baseline:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
@@ -297,10 +296,13 @@ paos skill stop robot-control-sim
 <a id="news"></a>
 ## News
 
+**2026-10-23 · v1.1.1 released:** Opper gateway support, local Skill development and Action rejection fixes, plus bilingual Track B and Piper X guides. [Release notes and packages](https://github.com/PhyAgentOS/PhyAgentOS-core/releases/tag/v1.1.1).
+
 **2026-10-10 · GOSIM Shenzhen 2026:** PhyAgentOS has been selected for Spotlight and will present in the Open Source Robotics track. [Read the announcement and event details](docs/news/gosim-shenzhen-2026.md).
 
 | Version | Date | Update |
 | --- | --- | --- |
+| **v1.1.1** | 2026-10-23 | Opper gateway, local Skill development and Action rejection fixes, bilingual Track B and Piper X guides, and a MuJoCo Quickstart. |
 | **v1.1.0** | 2026-10-09 | Centralized provider management, direct OpenAI Responses and new gateways, Skill Runtime packaging and startup improvements, and an opt-in governed interaction foundation. |
 | **v1.0.0** | 2026-08-30 | Initial stable release of PhyAgentOS. |
 | **v0.2.3** | 2026-08-27 | Physical Execution Skills can be installed and managed independently, activated into immutable AgentTask bindings, and used through governed Query, Action, and Session Tool API lifecycles with recovery and version-scoped experience. |

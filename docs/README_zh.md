@@ -2,8 +2,8 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-版本：**1.0.0**<br>
-实现基线：**Forge Skill binding、Query/Action/Session Tool API、AgentTask recovery、版本作用域经验，2026-08-30**
+版本：**1.1.1**<br>
+实现基线：**Forge Skill binding、Query/Action/Session Tool API、AgentTask recovery、版本作用域经验，2026-10-23**
 
 本目录面向用户、运维和开发者。源码、配置 Schema 与测试定义当前行为；历史设计报告不替代运行契约。
 开发从[贡献指南](../CONTRIBUTING_zh.md) → [TrackB 总览](user_development_guide/track_b/README_zh.md) → [三种开发模式](user_development_guide/track_b/SKILL_DEVELOPMENT_zh.md) → [Piper X 示例](user_development_guide/PIPER_X_DEMO_zh.md)进入。

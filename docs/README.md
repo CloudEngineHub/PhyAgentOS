@@ -2,8 +2,8 @@
 
 [English](README.md) | [简体中文](README_zh.md)
 
-Version: **1.0.0**<br>
-Implementation baseline: **Forge Skill binding, Query/Action/Session Tool API, AgentTask recovery, and version-scoped experience, 2026-08-30**
+Version: **1.1.1**<br>
+Implementation baseline: **Forge Skill binding, Query/Action/Session Tool API, AgentTask recovery, and version-scoped experience, 2026-10-23**
 
 This directory serves users, operators and developers. Source, schemas and tests define current behavior; historical design reports do not replace runtime contracts.
 Start development with the [contribution guide](../CONTRIBUTING.md) → [TrackB overview](user_development_guide/track_b/README.md) → [three extension modes](user_development_guide/track_b/SKILL_DEVELOPMENT.md) → [Piper X example](user_development_guide/PIPER_X_DEMO.md).

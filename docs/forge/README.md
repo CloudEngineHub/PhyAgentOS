@@ -2,7 +2,7 @@
 
 [中文](README_zh.md) · [Documentation index](../README.md)
 
-> Applies to PhyAgentOS 1.0.0.
+> Applies to PhyAgentOS 1.1.1.
 
 This is the canonical reference for public Tool API routes, identities and invocation/task semantics. Node-side messages and dataflow belong to [TrackB protocols](../user_development_guide/track_b/PROTOCOLS.md); optional interaction has its own [restricted extension contract](../interaction/README.md).
 

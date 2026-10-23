@@ -10,20 +10,20 @@
   <p>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-4264ce" alt="MIT License"></a>
     <img src="https://img.shields.io/badge/Python-3.11%2B-4264ce?logo=python&amp;logoColor=white" alt="Python 3.11 or newer">
-    <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Release-v1.1.0-4264ce" alt="Release v1.1.0"></a>
+    <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Release-v1.1.1-4264ce" alt="Release v1.1.1"></a>
     <a href="https://github.com/PhyAgentOS/PhyAgentOS-core/stargazers"><img src="https://img.shields.io/github/stars/PhyAgentOS/PhyAgentOS-core?style=flat&amp;color=4264ce" alt="GitHub stars"></a>
   </p>
   <p><a href="README.md">English</a> · <a href="README_zh.md">简体中文</a></p>
   <p>
     <a href="#what">What</a> ·
     <a href="#why">Why</a> ·
-    <a href="#release">v1.1.0</a> ·
+    <a href="#release">v1.1.1</a> ·
     <a href="#quick-start">安装配置</a> ·
     <a href="#simulation-quickstart">仿真 Quickstart</a> ·
     <a href="#quickstart-examples">快速启动示例</a> ·
     <a href="#documentation">文档导航</a>
   </p>
-  <p><a href="docs/news/gosim-shenzhen-2026_zh.md"><b>GOSIM Shenzhen 2026 Spotlight · 10 月 16–17 日 · 深圳现场见</b></a></p>
+  <p><a href="#release"><b>v1.1.1 · Skill 开发、执行可靠性与 Opper 网关</b></a></p>
 </div>
 
 ---
@@ -46,18 +46,17 @@
 | **可复用的物理执行能力** | 将环境相关工具与 Runtime 封装为版本化 Skill，使认知规划与机器人接入保持解耦。 |
 
 <a id="release"></a>
-## v1.1.0 更新亮点
+## v1.1.1 更新亮点
 
-**Provider 管理、Skill Runtime 与受治理的交互。** 本次版本包含：
+**Skill 开发、执行可靠性与 Opper 网关。** 相对 v1.1.0 的主要变化：
 
-- **Provider 管理：** 集中配置、连接测试、认证、模型发现、模型选择保存与会话级覆盖。
-- **更多模型接入：** 直接支持 OpenAI Responses API 的工具调用、多模态输入、推理强度与 Forge 验证；新增 Requesty、Cheaper Inference 和 API Route 网关。
-- **Skill Runtime 更新：** `directory_tar_gz` Node 包可携带运行时依赖并校验内部相对符号链接；profile 支持启动超时、`required_tools` 覆盖，以及用于 LIBERO 0.3.4 前置准备的启动 hook 上下文。
-- **受治理的交互基础（默认关闭）：** 通过冻结绑定、持久化 Runner 和 Supervisor，将 AgentTask、Session、多步决策、独立根目标验证与一条去重的经验 episode 连接起来。参见[适用范围与启用说明](docs/interaction/README_zh.md)。
-- **可靠性改进：** 保留有效 cron 任务，完善 Dora 状态解析和 profile 环境注入、归档与图片路径处理，并在模型调用失败时保留对话历史。取消后拒绝新的执行意图并丢弃迟到决策；不确定操作不会自动重发，资源保护保持到执行状态完成核对。
-- **指南与验证：** 扩展回归测试和构建检查，完善双语文档、Piper 与 LIBERO-10 快速启动，以及评测范围和结果说明。
+- **Opper 网关：** 新增 OpenAI 兼容接入，支持 Provider 选择、环境变量凭据和原样传递模型标识。
+- **本地 Skill 开发：** 本地修改工作流文档和 Node 可执行文件后可带警告运行，绑定与经验仍记录实际激活的工作流哈希；显式 Node 校验和安装缓存验收保持严格。
+- **Action 拒绝处理：** Gateway 明确在分发前拒绝的请求记为失败，不再阻塞后续重试或成功任务的最终判定；超时和远端执行不确定时仍保留原有保护。
+- **Piper X 开发示例：** 双语 Track B 指南与独立仿真 Skill 示例覆盖模型转换、原始 Node locks、打包和历史验证记录；原始运行基线见 [Piper X 指南](docs/user_development_guide/PIPER_X_DEMO_zh.md)。
+- **文档整理：** 合并双语手册和贡献指南，新增带实时 GIF 的 MuJoCo Quickstart，并保留评测文档入口。
 
-查看[完整更新记录](CHANGELOG.md)和[相对 v1.0.0 的全部变更](https://github.com/PhyAgentOS/PhyAgentOS-core/compare/v1.0.0...v1.1.0)。
+查看[完整更新记录](CHANGELOG.md)和[相对 v1.1.0 的全部变更](https://github.com/PhyAgentOS/PhyAgentOS-core/compare/v1.1.0...v1.1.1)。
 
 <a id="quick-start"></a>
 ## 安装与配置
@@ -67,7 +66,7 @@
 ### 1. 安装与初始化
 
 ```bash
-git clone --branch v1.1.0 https://github.com/PhyAgentOS/PhyAgentOS-core.git
+git clone --branch v1.1.1 https://github.com/PhyAgentOS/PhyAgentOS-core.git
 cd PhyAgentOS-core
 python -m venv .venv
 source .venv/bin/activate
@@ -91,7 +90,7 @@ Docker/Secret 输入、进程启动覆盖和 `/provider`、`/model`、`/effort`�
 不改变正在执行的任务及其他会话。
 
 <details>
-<summary>完整配置参考（v1.1.0）</summary>
+<summary>完整配置参考（v1.1.1）</summary>
 
 配置保存为 camelCase，同时也接受 snake_case 输入。
 
@@ -175,7 +174,7 @@ MuJoCo 和图像查看器需要可用的图形显示或虚拟显示环境。
 
 ### 1. 安装 Dora
 
-v1.1.0 沿用 Dora CLI **0.4.1**（`dora-message` **0.7.0**）兼容基线：
+v1.1.1 沿用 Dora CLI **0.4.1**（`dora-message` **0.7.0**）兼容基线：
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf \
@@ -298,10 +297,13 @@ paos skill stop robot-control-sim
 <a id="news"></a>
 ## News · 最新动态
 
+**2026-10-23 · v1.1.1 发布：** 新增 Opper 网关，完善本地 Skill 开发和 Action 拒绝处理，并补充双语 Track B 与 Piper X 开发指南。[查看发布说明与安装包](https://github.com/PhyAgentOS/PhyAgentOS-core/releases/tag/v1.1.1)。
+
 **2026-10-10 · GOSIM Shenzhen 2026：** PhyAgentOS 入选 Spotlight，并将在开源机器人分论坛做主题分享。[查看活动公告与现场信息](docs/news/gosim-shenzhen-2026_zh.md)。
 
 | 版本 | 日期 | 更新 |
 | --- | --- | --- |
+| **v1.1.1** | 2026-10-23 | Opper 网关、本地 Skill 开发与 Action 拒绝处理修复、双语 Track B 和 Piper X 指南，以及 MuJoCo Quickstart。 |
 | **v1.1.0** | 2026-10-09 | 集中式 Provider 管理、直接 OpenAI Responses 与新网关接入、Skill Runtime 打包和启动改进，以及默认关闭的受治理交互基础。 |
 | **v1.0.0** | 2026-08-30 | Initial stable release of PhyAgentOS. |
 | **v0.2.3** | 2026-08-27 | Physical Execution Skill 可独立安装和管理，经显式激活冻结到 AgentTask，并通过受治理的 Query、Action、Session Tool API 生命周期执行，支持恢复和按版本限定的经验。 |
