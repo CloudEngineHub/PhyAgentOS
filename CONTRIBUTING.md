@@ -75,3 +75,5 @@ as a worked example, checking its version and model assumptions before adapting 
    repositories; then follow the platform's published instructions.
 
 Do not include credentials, private environment configuration or unrelated local logs in a contribution.
+
+Maintainers publishing a version should follow the [GitHub and PyPI release guide](docs/RELEASING.md).
