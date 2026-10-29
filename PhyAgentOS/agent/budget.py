@@ -8,12 +8,31 @@ from typing import Any
 from PhyAgentOS.utils.helpers import estimate_prompt_tokens_chain
 
 
+def _model_input_window(model: str) -> int | None:
+    """Resolve catalog IDs like effort.py without importing LiteLLM on direct paths."""
+    litellm = sys.modules.get("litellm")
+    if litellm is None:
+        return None
+    catalog = getattr(litellm, "model_cost", {})
+    info = catalog.get(model)
+    if info is None:
+        try:
+            native_model, adapter, _, _ = litellm.get_llm_provider(model=model)
+            info = catalog.get(f"{adapter}/{native_model}")
+            # Only native routes may fall back to the unprefixed entry. Gateway
+            # limits cannot be inferred by stripping OpenRouter/Azure prefixes.
+            if info is None and adapter in {"openai", "anthropic"}:
+                info = catalog.get(native_model)
+        except Exception:
+            return None
+    window = info.get("max_input_tokens") if isinstance(info, dict) else None
+    return window if type(window) is int and window > 0 else None
+
+
 def request_budget(provider: Any, model: str, configured_window: int, *, archival: bool = False) -> tuple[int | None, int]:
     # contextWindowTokens is an archival threshold, not a model capability.
     # Do not guess a hard request ceiling for unknown deployment aliases.
-    catalog = getattr(sys.modules.get("litellm"), "model_cost", {})
-    known_input = catalog.get(model, {}).get("max_input_tokens")
-    window = known_input if isinstance(known_input, int) and known_input > 0 else None
+    window = _model_input_window(model)
     generation = getattr(provider, "generation", None)
     output = max(1, getattr(generation, "max_tokens", 4096))
     if archival:
