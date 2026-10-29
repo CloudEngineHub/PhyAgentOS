@@ -273,6 +273,12 @@ paos skill stop robot-control-sim
 - [Piper X 二次开发 demo](docs/user_development_guide/PIPER_X_DEMO_zh.md)：为 `robot-control-sim` 接入另一种机械臂，包含模型转换与两种控制方式。
 - [Bundle 与 Tool 接入参考](docs/user_development_guide/README_zh.md)：manifest 字段、打包和本地安装。
 
+### 会话记忆与恢复
+
+`contextWindowTokens` 仅控制归档阈值，不代表模型上下文上限；非正值关闭自动归档。当进程已加载 LiteLLM 时，请求会按其本地 catalog 解析配置中的模型 ID（包括原生 `anthropic/`、`openai/` 前缀），在已知模型窗口中预留输出空间，并保留最近一轮完整对话。网关路由必须有自己的 catalog 条目，不继承原生模型窗口。仅运行 `custom` / `openai_responses` 的进程不会为此检查额外加载 LiteLLM；若其他路径也未加载它，catalog 请求窗口保护不会启用，但分块归档仍然有效。未知部署别名不会被归档阈值强行限制请求窗口。如果已知窗口容不下当前轮次或固定指令，PAOS 会说明原因，保留原始会话。图片按每张约 2,048 tokens 的额度估算，不再把 base64 当作文本计数；实际视觉用量因模型和分辨率而异。
+
+记忆归档采用自动工具选择，严格校验 `save_memory` 的返回结果；返回纯文本时仅追加一次格式重试。超大历史按预算分片处理，在预算允许时优先保留完整消息，并持久化进度以支持失败续跑。归档失败会显示在回复中，自动重试暂停 60 秒。`/new` 首先将完整原始会话备份到 `<workspace>/sessions/archives/`；即使模型归档失败，仍会开启新会话并告知备份路径。原始备份保留对话和待完成的归档检查点，供后续恢复；备份不等于已完成记忆摘要。
+
 <a id="quickstart-examples"></a>
 ## 更多示例
 

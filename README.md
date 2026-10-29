@@ -272,6 +272,12 @@ paos skill stop robot-control-sim
 - [Piper X development demo](docs/user_development_guide/PIPER_X_DEMO.md): adapt `robot-control-sim` to another arm, including model conversion and both control modes.
 - [Bundle and Tool integration reference](docs/user_development_guide/README.md): manifest fields, packaging and local installation.
 
+### Session memory and recovery
+
+`contextWindowTokens` controls the archival threshold, not the model context limit; a nonpositive value disables automatic archival. When LiteLLM is already loaded, requests resolve the configured model ID against its local catalog (including native `anthropic/` and `openai/` prefixes), reserve output space within the known window, and keep the latest complete turn. Gateway routes require their own catalog entry; they do not inherit a native model limit. Direct-only `custom` / `openai_responses` processes do not load LiteLLM just for this check, so catalog-based request protection is inactive unless another path has loaded it; bounded archival still applies. Unknown deployment aliases do not receive an invented hard limit from the archival threshold. If known-window protection cannot fit the current turn or fixed instructions, PAOS reports the cause without deleting the session. Image inputs receive an approximate 2,048-token allowance per image rather than counting base64 as text; actual vision usage varies by model and resolution.
+
+Memory archival uses automatic tool selection with validated `save_memory` results and one format-repair retry for plain-text responses. Large histories are processed in bounded fragments with durable progress checkpoints, preferring complete messages when they fit. Archival failures appear in the reply and retries pause for 60 seconds. `/new` first saves the complete raw session under `<workspace>/sessions/archives/`; if LLM archival fails, it still starts a new session and reports the backup path. Raw backups retain the original conversation and any pending archival checkpoint for later recovery; a backup is not a completed memory summary.
+
 <a id="quickstart-examples"></a>
 ## More examples
 
