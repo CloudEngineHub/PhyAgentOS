@@ -15,6 +15,14 @@ from PhyAgentOS.session.manager import SessionManager
 from PhyAgentOS.utils import helpers
 
 
+@pytest.fixture(autouse=True)
+def known_test_model_window(monkeypatch):
+    # Exercise request guards against an actual declared model capability,
+    # independently of the configurable archival threshold.
+    import litellm
+    monkeypatch.setitem(litellm.model_cost, "test-thinking", {"max_input_tokens": 4096})
+
+
 class ArchivalProvider(LLMProvider):
     def __init__(self):
         super().__init__()
@@ -179,7 +187,7 @@ def test_tokenizer_failure_has_nonzero_fallback_including_tool_arguments(monkeyp
     payload = [{"role": "assistant", "content": None, "tool_calls": [{"arguments": "中" * 1000}]}]
     count, source = helpers.estimate_prompt_tokens_chain(object(), "test", payload)
     assert count >= 3000
-    assert source == "tiktoken"  # chain remains compatible; protection never returns zero
+    assert source == "utf8_bytes"
 
 
 def test_request_budget_reserves_output_and_clamps_known_model(monkeypatch):
@@ -199,7 +207,7 @@ def test_trim_keeps_complete_latest_tool_exchange_without_mutating_history():
     result, reduced = fit_history(messages, p, "test-thinking", 300, [])
     assert reduced and result == [messages[0], *messages[3:]]
     assert len(messages) == 6
-    with pytest.raises(ValueError, match="Current turn"):
+    with pytest.raises(ValueError, match="System instructions"):
         fit_history(result, p, "test-thinking", 1, [])
 
 

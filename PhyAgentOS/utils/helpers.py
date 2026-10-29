@@ -123,55 +123,47 @@ def build_assistant_message(
     return msg
 
 
+def _estimate_prompt_tokens(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]] | None = None,
+) -> tuple[int, str]:
+    # Image tokens depend on the vision model and resolution, not the encoded
+    # file length. Reserve an approximate visual allowance without tokenizing
+    # image bytes or modifying the payload that actually goes to the provider.
+    counted = []
+    image_tokens = 0
+    for message in messages:
+        clean = dict(message)
+        if isinstance(message.get("content"), list):
+            parts = []
+            for part in message["content"]:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    parts.append({"type": "text", "text": "[image]"})
+                    image_tokens += 2048
+                else:
+                    parts.append(part)
+            clean["content"] = parts
+        counted.append(clean)
+    payload = json.dumps({"messages": counted, "tools": tools or []}, ensure_ascii=False)
+    overhead = 8 * len(messages) + image_tokens
+    try:
+        enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(payload)) + overhead, "tiktoken"
+    except Exception:
+        return max(1, len(payload.encode("utf-8"))) + overhead, "utf8_bytes"
+
+
 def estimate_prompt_tokens(
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None = None,
 ) -> int:
-    """Count the full payload, including tool arguments and reasoning fields.
-
-    UTF-8 byte length is a conservative fallback when the tokenizer/cache is
-    unavailable. Returning zero would silently disable context protection.
-    """
-    payload = json.dumps({"messages": messages, "tools": tools or []}, ensure_ascii=False)
-    try:
-        enc = tiktoken.get_encoding("cl100k_base")
-        return len(enc.encode(payload)) + 8 * len(messages)
-    except Exception:
-        return max(1, len(payload.encode("utf-8"))) + 8 * len(messages)
+    """Estimate text/tool payloads plus a fixed approximate vision allowance."""
+    return _estimate_prompt_tokens(messages, tools)[0]
 
 
 def estimate_message_tokens(message: dict[str, Any]) -> int:
-    """Estimate prompt tokens contributed by one persisted message."""
-    content = message.get("content")
-    parts: list[str] = []
-    if isinstance(content, str):
-        parts.append(content)
-    elif isinstance(content, list):
-        for part in content:
-            if isinstance(part, dict) and part.get("type") == "text":
-                text = part.get("text", "")
-                if text:
-                    parts.append(text)
-            else:
-                parts.append(json.dumps(part, ensure_ascii=False))
-    elif content is not None:
-        parts.append(json.dumps(content, ensure_ascii=False))
-
-    for key in ("name", "tool_call_id"):
-        value = message.get(key)
-        if isinstance(value, str) and value:
-            parts.append(value)
-    if message.get("tool_calls"):
-        parts.append(json.dumps(message["tool_calls"], ensure_ascii=False))
-
-    payload = "\n".join(parts)
-    if not payload:
-        return 1
-    try:
-        enc = tiktoken.get_encoding("cl100k_base")
-        return max(1, len(enc.encode(payload)))
-    except Exception:
-        return max(1, len(payload) // 4)
+    """Use the same accounting for consolidation boundaries and request probes."""
+    return estimate_prompt_tokens([message])
 
 
 def estimate_prompt_tokens_chain(
@@ -190,10 +182,7 @@ def estimate_prompt_tokens_chain(
         except Exception:
             pass
 
-    estimated = estimate_prompt_tokens(messages, tools)
-    if estimated > 0:
-        return int(estimated), "tiktoken"
-    return 0, "none"
+    return _estimate_prompt_tokens(messages, tools)
 
 
 def sync_workspace_templates(

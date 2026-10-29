@@ -668,7 +668,7 @@ class AgentLoop:
             # create the raw backup still prevents clearing anything.
             try:
                 backup = self.sessions.backup(session)
-            except OSError:
+            except (OSError, TypeError, ValueError):
                 return OutboundMessage(
                     channel=msg.channel, chat_id=msg.chat_id,
                     content="Session backup failed; the session was not cleared. Check workspace storage.",
