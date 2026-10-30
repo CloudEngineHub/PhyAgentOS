@@ -9,6 +9,112 @@ from PhyAgentOS.forge.tool_client import ForgeToolClient
 from PhyAgentOS.skill_runtime.state import RuntimeState, RuntimeStateStore
 
 
+@pytest.mark.parametrize(
+    "boundary",
+    ["replacement", "busy", "valid", "running", "unknown", "unreachable", "journal_error"],
+)
+async def test_agent_recovery_uses_one_locked_identity_checked_path(
+    tmp_path, monkeypatch, boundary
+):
+    from PhyAgentOS.forge.task import AgentTaskCoordinator
+    from PhyAgentOS.skill_runtime.integration import (
+        ActiveSkillRuntime,
+        DynamicForgeToolClient,
+        DynamicRuntimeSet,
+        PersistentInvocationSet,
+        PersistentSessionSet,
+        PersistentTaskBindingSet,
+    )
+    from PhyAgentOS.skill_runtime.locking import SkillOperationLock
+
+    coordinator, task, _, _, _, _ = await _bound_system(tmp_path, monkeypatch)
+    accepted = await coordinator.start_action(task.task_id, "demo.action", {})
+    invocation = accepted["data"]["invocation_id"]
+    coordinator.observe_action(task.task_id, invocation, {"ok": True, "data": {"phase": "unknown"}})
+    binding = task.primary_skill_binding
+    states = RuntimeStateStore(tmp_path / "states")
+    state = RuntimeState(
+        skill_name=binding.skill_name,
+        profile=binding.runtime_profile,
+        status="running",
+        flow_name="probe",
+        gateway_url=binding.gateway_url,
+        runtime_instance_id="replacement-runtime"
+        if boundary == "replacement"
+        else binding.runtime_instance_id,
+        gateway_identity="replacement-gateway"
+        if boundary == "replacement"
+        else binding.gateway_identity,
+    )
+    states.save(state)
+    requests = []
+
+    def gateway(request):
+        requests.append((request.method, request.url.path))
+        if request.url.path != "/tools" and boundary == "unreachable":
+            raise httpx.ConnectError("offline")
+        data = (
+            {"gateway_identity": state.gateway_identity}
+            if request.url.path == "/tools"
+            else {"phase": boundary if boundary in {"running", "unknown"} else "succeeded"}
+        )
+        return httpx.Response(200, json={"ok": True, "data": data})
+
+    async with ForgeToolClient(state.gateway_url, transport=httpx.MockTransport(gateway)) as client:
+        registry = coordinator.binding_resolver.runtime_registry
+        registry.replace(
+            ActiveSkillRuntime(
+                skill_name=state.skill_name,
+                skill_version="1.2.3",
+                profile=state.profile,
+                runtime_instance_id=state.runtime_instance_id,
+                gateway_url=state.gateway_url,
+                gateway_identity=state.gateway_identity,
+                client=client,
+                invocation_ids=PersistentInvocationSet(state.skill_name, states),
+                session_ids=PersistentSessionSet(state.skill_name, states),
+                task_binding_ids=PersistentTaskBindingSet(state.skill_name, states),
+            )
+        )
+        recovered = AgentTaskCoordinator(
+            workspace=coordinator.workspace,
+            config=coordinator.config,
+            client=DynamicForgeToolClient(registry),
+            binding_resolver=coordinator.binding_resolver,
+            activation_manager=coordinator.activation_manager,
+            store=coordinator.store,
+            runtime_invocation_ids=DynamicRuntimeSet(registry, "invocation_ids"),
+            runtime_session_ids=DynamicRuntimeSet(registry, "session_ids"),
+            runtime_task_binding_ids=DynamicRuntimeSet(registry, "task_binding_ids"),
+        )
+        if boundary == "journal_error":
+            monkeypatch.setattr(
+                coordinator.store,
+                "active",
+                lambda: (_ for _ in ()).throw(OSError("journal unreadable")),
+            )
+        if boundary == "busy":
+            with SkillOperationLock(states.root, state.skill_name):
+                await recovered.reconcile_nonterminal()
+        else:
+            await recovered.reconcile_nonterminal()
+    updated = states.load(state.skill_name)
+    if boundary in {"running", "unknown", "unreachable"}:
+        assert updated.active_invocations == (invocation,)
+        assert updated.active_task_bindings == (binding.binding_id,)
+        phase = "unknown" if boundary == "unreachable" else boundary
+        assert recovered.get_task(task.task_id).execution_records[0].status == phase
+    elif boundary == "valid":
+        assert not updated.active_invocations
+        assert updated.active_task_bindings == (binding.binding_id,)
+        assert recovered.get_task(task.task_id).execution_records[0].status == "succeeded"
+        assert requests == [("GET", "/tools"), ("GET", f"/invocations/{invocation}")]
+    else:
+        assert updated == state
+        assert all(path != f"/invocations/{invocation}" for _, path in requests)
+        assert recovered.get_task(task.task_id).execution_records[0].status == "unknown"
+
+
 async def _unknown_task(tmp_path, monkeypatch, semantics="action"):
     coordinator, task, _, invocations, sessions, bindings = await _bound_system(
         tmp_path, monkeypatch

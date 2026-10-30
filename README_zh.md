@@ -269,6 +269,7 @@ paos skill stop robot-control-sim
 普通停止会先根据配置的工作区恢复保留的执行引用。
 也可使用 `paos skill reconcile robot-control-sim --workspace /path/to/workspace` 显式重试恢复。
 无法确认终态的动作仍受保护；`--force` 表示明确授权终止 runtime。
+每轮 runtime 使用独立的 Dora flow 名称，可通过 `paos skill status` 查看。
 平台限制见[运行恢复与进程归属](docs/user_development_guide/track_b/RUNTIME_zh.md#运行恢复与进程归属)。
 
 ### 在此基础上二次开发

@@ -7,6 +7,7 @@ containment. Never infer ownership from a command name or a reused PID.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import signal
@@ -86,16 +87,18 @@ class RuntimeProcessTracker:
         if open_pidfd is not None and send_pidfd is not None:
             try:
                 fd = open_pidfd(pid)
+                try:
+                    if self._identity(pid) == start:
+                        send_pidfd(fd, signum)
+                finally:
+                    os.close(fd)
             except ProcessLookupError:
                 return
-            try:
-                if self._identity(pid) == start:
-                    send_pidfd(fd, signum)
-            except ProcessLookupError:
-                pass
-            finally:
-                os.close(fd)
-            return
+            except OSError as exc:
+                if exc.errno not in {errno.ENOSYS, errno.EOPNOTSUPP}:
+                    raise
+            else:
+                return
         # Without pidfd the start-time re-check is the only guard; it narrows
         # the reuse window but cannot close it.
         try:

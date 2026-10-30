@@ -81,12 +81,20 @@ async def _reconcile_locked(
         return
     bindings = set(state.active_task_bindings)
     invocations, sessions = set(state.active_invocations), set(state.active_sessions)
-    if not (bindings or invocations or sessions):
+    candidates = tasks.bound_tasks(bindings)
+    active = tasks.active()
+    if (
+        active is not None
+        and active.primary_skill_binding is not None
+        and all(task.task_id != active.task_id for task in candidates)
+    ):
+        candidates.append(active)
+    if not (bindings or invocations or sessions or candidates):
         return
     owned_client = client is None
     client = client or ForgeToolClient(state.gateway_url, timeout_s=min(timeout_s, 3.0))
 
-    def release_reference(field_name: str, reference: str) -> None:
+    def change_reference(field_name: str, reference: str, *, add: bool = False) -> None:
         current = states.load(skill_name)
         if current is None or (
             current.runtime_instance_id != state.runtime_instance_id
@@ -96,7 +104,8 @@ async def _reconcile_locked(
             raise ValueError("Runtime changed during reconciliation")
         # Reload and remove only this confirmed identity. Unrelated references
         # added since recovery began must survive the update.
-        remaining = tuple(sorted(set(getattr(current, field_name)) - {reference}))
+        items = set(getattr(current, field_name))
+        remaining = tuple(sorted(items | {reference} if add else items - {reference}))
         states.save(
             current.with_status(
                 current.status,
@@ -121,7 +130,7 @@ async def _reconcile_locked(
                 raise ValueError("Gateway identity changed; references were retained")
             seen_invocations: set[str] = set()
             seen_bindings: set[str] = set()
-            for task in tasks.bound_tasks(bindings):
+            for task in candidates:
                 binding = task.primary_skill_binding
                 assert binding is not None
                 seen_bindings.add(binding.binding_id)
@@ -139,33 +148,51 @@ async def _reconcile_locked(
                         f"{task.task_id}: interaction supervisor recovery required"
                     )
                     continue
+                if not task.terminal:
+                    change_reference("active_task_bindings", binding.binding_id, add=True)
+                    bindings.add(binding.binding_id)
                 for record in task.execution_records:
                     if record.semantics == "query":
                         continue
                     if not record.invocation_id:
                         if record.status not in REMOTE_TERMINAL:
+
+                            def mark_unknown(current, record_id=record.record_id):
+                                for item in current.execution_records:
+                                    if item.record_id == record_id:
+                                        item.status = "unknown"
+                                        item.updated_at = utc_now()
+                                        item.error = {
+                                            "type": "RecoveryUnknown",
+                                            "message": "dispatch intent has no invocation identity; request was not resent",
+                                        }
+
+                            tasks.update(
+                                task.task_id, mark_unknown, event_type="execution_recovery_unknown"
+                            )
                             report.unresolved.append(
                                 f"{record.record_id}: no remote invocation identity; retained"
                             )
                         continue
                     invocation_id = record.invocation_id
                     tracker = sessions if record.semantics == "session" else invocations
+                    field_name = (
+                        "active_sessions" if record.semantics == "session" else "active_invocations"
+                    )
+                    if not task.terminal and record.status not in REMOTE_TERMINAL:
+                        change_reference(field_name, invocation_id, add=True)
+                        tracker.add(invocation_id)
                     if invocation_id not in tracker and record.status != "unknown":
                         continue
                     seen_invocations.add(invocation_id)
+                    observation_received = False
                     try:
                         response = await client.invocation_status(invocation_id)
-                        returned_id = response.get("data", {}).get(
-                            "invocation_id", invocation_id
-                        )
+                        returned_id = response.get("data", {}).get("invocation_id", invocation_id)
                         if returned_id != invocation_id:
                             raise ValueError("Gateway returned a different invocation identity")
                         status = _tool_status(response, default="unknown")
-                        if status not in REMOTE_TERMINAL:
-                            report.unresolved.append(
-                                f"{invocation_id}: remote state is {status}"
-                            )
-                            continue
+                        observation_received = True
 
                         def mutate(
                             current, record_id=record.record_id, facts=response, phase=status
@@ -182,37 +209,52 @@ async def _reconcile_locked(
                             event_type="execution_reconciled",
                             payload={"invocation_id": invocation_id, "phase": status},
                         )
+                        if status not in REMOTE_TERMINAL:
+                            report.unresolved.append(f"{invocation_id}: remote state is {status}")
+                            continue
                         released = (
                             report.released_sessions
                             if record.semantics == "session"
                             else report.released_invocations
                         )
-                        field_name = (
-                            "active_sessions"
-                            if record.semantics == "session"
-                            else "active_invocations"
-                        )
-                        release_reference(field_name, invocation_id)
+                        change_reference(field_name, invocation_id)
                         released.append(invocation_id)
                     except Exception as exc:
-                        report.unresolved.append(
-                            f"{invocation_id}: {type(exc).__name__}: {exc}"
-                        )
+                        if (
+                            not observation_received
+                            and not task.terminal
+                            and record.status not in REMOTE_TERMINAL
+                        ):
+
+                            def observation_unknown(current, record_id=record.record_id, error=exc):
+                                for item in current.execution_records:
+                                    if item.record_id == record_id:
+                                        item.status = "unknown"
+                                        item.updated_at = utc_now()
+                                        item.error = {
+                                            "type": type(error).__name__,
+                                            "message": str(error),
+                                        }
+
+                            tasks.update(
+                                task.task_id,
+                                observation_unknown,
+                                event_type="execution_recovery_unknown",
+                            )
+                        report.unresolved.append(f"{invocation_id}: {type(exc).__name__}: {exc}")
                 current_task = tasks.get(task.task_id)
                 if current_task.terminal and all(
                     item.semantics == "query" or item.status in REMOTE_TERMINAL
                     for item in current_task.execution_records
                 ):
-                    release_reference("active_task_bindings", binding.binding_id)
+                    change_reference("active_task_bindings", binding.binding_id)
                     report.released_bindings.append(binding.binding_id)
                 elif not current_task.terminal:
                     report.unresolved.append(
                         f"{task.task_id}: task is still {current_task.status.value}; binding retained"
                     )
             for reference in (invocations | sessions) - seen_invocations:
-                report.unresolved.append(
-                    f"{reference}: no matching recoverable execution record"
-                )
+                report.unresolved.append(f"{reference}: no matching recoverable execution record")
             for reference in bindings - seen_bindings:
                 report.unresolved.append(f"{reference}: no matching task in this workspace")
     except Exception as exc:

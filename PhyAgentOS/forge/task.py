@@ -1097,12 +1097,31 @@ class AgentTaskCoordinator:
                 )
                 for reason in report.unresolved:
                     logger.warning("Runtime reconciliation: {}", reason)
+                # Persistent Runtime recovery is wholly owned by the identity-
+                # checked, lifecycle-locked service. Never fall through to a
+                # second writer after a busy lock or a binding mismatch.
+                try:
+                    return self.store.active()
+                except Exception as exc:
+                    logger.warning("Cannot read active task after reconciliation: {}", exc)
+                    return None
         task = self.store.active()
         if task is not None and self.interaction.managed(task.task_id):
             return task
         if task is None:
             return None
         binding = task.primary_skill_binding
+        if binding is not None and self.binding_resolver is not None:
+            runtime = self.binding_resolver.runtime_registry.current()
+            if runtime is None or (
+                runtime.runtime_instance_id != binding.runtime_instance_id
+                or runtime.gateway_identity != binding.gateway_identity
+                or runtime.gateway_url != binding.gateway_url
+                or runtime.skill_name != binding.skill_name
+                or runtime.profile != binding.runtime_profile
+            ):
+                logger.warning("Task {} retains a binding to a different Runtime", task.task_id)
+                return task
         if binding is not None and self.runtime_task_binding_ids is not None:
             self.runtime_task_binding_ids.add(binding.binding_id)
         for record in task.execution_records:

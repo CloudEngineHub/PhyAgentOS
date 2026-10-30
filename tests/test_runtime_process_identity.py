@@ -1,3 +1,4 @@
+import errno
 import os
 import signal
 
@@ -48,3 +49,26 @@ def test_fallback_signal_still_requires_matching_start_time(tmp_path, monkeypatc
     monkeypatch.setattr(os, "kill", lambda pid, sig: calls.append((pid, sig)))
     tracker._signal(123, "original", signal.SIGTERM)
     assert calls == []
+
+
+@pytest.mark.parametrize("error", [errno.ENOSYS, errno.EOPNOTSUPP, errno.EPERM])
+def test_present_pidfd_handles_unsupported_syscall_but_preserves_permission_errors(
+    tmp_path, monkeypatch, error
+):
+    tracker = RuntimeProcessTracker(tmp_path, "runtime_probe")
+
+    def unsupported(pid):
+        raise OSError(error, "pidfd unavailable")
+
+    monkeypatch.setattr(os, "pidfd_open", unsupported, raising=False)
+    monkeypatch.setattr(signal, "pidfd_send_signal", lambda *args: None, raising=False)
+    monkeypatch.setattr(tracker, "_identity", lambda pid: "original")
+    calls = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: calls.append((pid, sig)))
+    if error == errno.EPERM:
+        with pytest.raises(PermissionError):
+            tracker._signal(123, "original", signal.SIGTERM)
+        assert not calls
+    else:
+        tracker._signal(123, "original", signal.SIGTERM)
+        assert calls == [(123, signal.SIGTERM)]

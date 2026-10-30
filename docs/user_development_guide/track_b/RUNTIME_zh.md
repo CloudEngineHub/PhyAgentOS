@@ -148,13 +148,16 @@ Agent 启动，也不得阻断非强制的停止。由 interaction 管理的任�
 无法观测，不能证明执行已结束。`skill stop --force` 会额外对属于该轮 Runtime 的
 Linux 进程执行 TERM/KILL，确认退出后再清理引用，不关闭共享 Dora 服务。
 验证失败时保留引用并报错；新一轮 Runtime 不能覆盖尚未释放的引用或已知存活进程，
-只有确认上一轮 Dora flow 仍在运行时才拒绝启动。冷机上 coordinator 未运行时，
-`start` 会照常继续并由自己把 coordinator 拉起来。
+冷机上 `start` 会先恢复 coordinator，再严格确认旧 flow 已退出，才替换旧状态；
+仍无法观测时保留旧状态并报错。每轮新 flow 使用独立名称，回滚仅操作本次启动。
+持久化 Agent 恢复与 CLI 共用持锁的对账路径，锁被占用或 Runtime 身份不匹配时，
+不会再进入另一条引用写入路径。
 
 新启动的节点通过 dataflow 环境接收 `PAOS_RUNTIME_INSTANCE_ID`，由共享 daemon
 创建的节点也会携带此标识。Linux 会发现同用户且携带该精确标识的进程，记录
 boot/PID/启动时间，并通过 pidfd 清理，覆盖脱离进程组的子进程并避免 PID 复用误杀。
-没有 `os.pidfd_open` 的解释器会回退到重新核对启动时间后再 `kill`。
+缺少 pidfd API，或内核返回 `ENOSYS` / `EOPNOTSUPP` 时，会在重新核对启动时间后
+回退到 `kill`；权限错误仍明确报错。
 节点应向子进程保留标识，启动脚本尽量 `exec` 最终程序。
 这是协作式跟踪，不是 cgroup 隔离：在发现前移除标识或无法读取环境的子进程可能无法识别。
 升级前的进程没有标识，需要人工检查并停止；其他平台仅验证 Dora flow 退出。

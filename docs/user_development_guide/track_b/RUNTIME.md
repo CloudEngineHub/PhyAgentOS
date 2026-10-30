@@ -152,15 +152,19 @@ queries and malformed JSON are observation errors, not proof of termination.
 `skill stop --force` additionally terminates owned Linux processes with TERM/KILL
 and verifies their exit before clearing references; it never shuts down shared Dora
 services. Failed verification retains references and reports failure. A new runtime
-generation cannot overwrite outstanding references or known live processes; it is
-refused only when the previous Dora flow is confirmed live. On a cold machine whose
-coordinator is not running, `start` proceeds and brings the coordinator up itself.
+generation cannot overwrite outstanding references or known live processes. On a
+cold host, `start` first restores the coordinator and strictly rechecks the previous
+flow before replacing its state. If observation still fails, the previous state is
+preserved. Each new generation uses a unique flow name so rollback targets only that
+launch. Persistent Agent recovery uses the same locked reconciliation path as the CLI;
+busy locks and mismatched Runtime identities never fall through to another writer.
 
 Newly launched nodes receive `PAOS_RUNTIME_INSTANCE_ID` in their dataflow environment,
 including when a shared daemon starts them. Linux tracking discovers same-user
 processes carrying that exact marker, records boot/PID/start-time identities, and
 uses pidfds for cleanup so detached children and PID reuse are handled separately.
-Builds without `os.pidfd_open` fall back to `kill` after re-checking the start time.
+Builds without pidfd APIs, or kernels returning `ENOSYS` / `EOPNOTSUPP`, fall back to
+`kill` after re-checking the start time. Permission errors remain failures.
 Nodes must preserve the marker in child environments and should `exec` their final
 program. This is cooperative tracking, not cgroup containment: children that remove
 the marker before discovery or cannot expose their environment may not be found.

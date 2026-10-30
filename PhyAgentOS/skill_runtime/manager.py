@@ -128,8 +128,6 @@ class RuntimeManager:
                     "Previous Runtime still owns processes or execution references; "
                     "run skill reconcile or skill stop --force before starting a new generation"
                 )
-            if self._flow_maybe_running(previous.flow_name, skill_name):
-                raise RuntimeManagerError("Previous Dora flow is still running; stop it before restarting")
 
         try:
             binary_root = self.environment_builder.prepare(manifest, profile_name)
@@ -137,6 +135,13 @@ class RuntimeManager:
             raise RuntimeManagerError(str(exc)) from exc
         self.runtime_root = binary_root
         self._preflight(manifest, profile, binary_root)
+        if previous is not None:
+            # Restore observation on a cold host, then strictly recheck. A failed
+            # query is not evidence that the previous generation has exited.
+            # Keep its state intact until this check succeeds.
+            self._ensure_dora_up(manifest, profile, binary_root)
+            if self._flow_running(previous.flow_name):
+                raise RuntimeManagerError("Previous Dora flow is still running; stop it before restarting")
         if self._gateway_snapshot(manifest) is not None:
             raise RuntimeManagerError(
                 f"Gateway address {manifest.gateway_url} is already in use; "
@@ -151,6 +156,9 @@ class RuntimeManager:
             gateway_url=manifest.gateway_url,
             started_at=utc_now(),
         )
+        # Rollback must never address another generation by a reusable name.
+        flow_name = f"{flow_name}-{starting.runtime_instance_id}"
+        starting = replace(starting, flow_name=flow_name)
         self.state_store.save(starting)
         self._log(skill_name, f"starting profile={profile_name} flow={flow_name}")
         launched = False
@@ -565,19 +573,6 @@ class RuntimeManager:
         return self._has_active_flow(
             self._parse_flow_list(result.stdout or ""), flow_name
         )
-
-    def _flow_maybe_running(self, flow_name: str, skill_name: str) -> bool:
-        """Best-effort check of a previous generation before relaunching.
-
-        A cold machine has no Dora coordinator yet, so ``dora list`` fails even
-        though no flow can be running. Refusing to start on that observation
-        would deadlock the only path that brings the coordinator up.
-        """
-        try:
-            return self._flow_running(flow_name)
-        except RuntimeManagerError as exc:
-            self._log(skill_name, f"cannot observe previous flow {flow_name}: {self._safe_error(exc)}")
-            return False
 
     @staticmethod
     def _parse_flow_list(output: str) -> list[dict[str, Any]]:
