@@ -1436,9 +1436,15 @@ def skill_stop(
         if not force and current is not None and (
             current.active_invocations or current.active_sessions or current.active_task_bindings
         ):
-            report = _reconcile_skill_references(skill_name, workspace)
-            for reason in report.unresolved:
-                console.print(f"Retained: {reason}", markup=False)
+            try:
+                report = _reconcile_skill_references(skill_name, workspace)
+            except Exception as error:  # noqa: BLE001 - recovery must not block stop
+                console.print(
+                    f"Retained: reconciliation failed: {error}", markup=False
+                )
+            else:
+                for reason in report.unresolved:
+                    console.print(f"Retained: {reason}", markup=False)
         state = RuntimeManager().stop(skill_name, force=force)
     except Exception as error:
         _skill_runtime_error(error)

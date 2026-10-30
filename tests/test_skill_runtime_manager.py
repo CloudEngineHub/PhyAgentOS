@@ -244,6 +244,59 @@ def test_stop_refuses_nonterminal_invocations_without_force(tmp_path: Path) -> N
         manager.stop("move-arm-by-ee")
 
 
+def _previous_generation(manager: RuntimeManager, status: str = "stopped") -> None:
+    manager.state_store.save(
+        RuntimeState(
+            skill_name="move-arm-by-ee",
+            profile="mujoco",
+            status=status,
+            flow_name="paos-move-arm-by-ee-mujoco",
+            gateway_url="http://127.0.0.1:19002",
+        )
+    )
+
+
+def test_start_proceeds_when_previous_flow_cannot_be_observed(
+    tmp_path: Path, monkeypatch
+) -> None:
+    manager = _manager(tmp_path)
+    _previous_generation(manager, status="running")
+    monkeypatch.setattr("shutil.which", lambda name: "dora")
+    monkeypatch.setattr(
+        manager,
+        "_run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, "", ""),
+    )
+    monkeypatch.setattr(manager, "_gateway_snapshot", lambda manifest: None)
+    monkeypatch.setattr(
+        manager,
+        "_flow_running",
+        lambda flow: (_ for _ in ()).throw(
+            RuntimeManagerError("Cannot confirm Runtime state: dora list failed")
+        ),
+    )
+    monkeypatch.setattr(manager, "_stop_flow", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        manager,
+        "_start_flow",
+        lambda *args: (_ for _ in ()).throw(RuntimeManagerError("reached launch")),
+    )
+
+    # A cold machine has no coordinator yet; start must reach the launch step
+    # so it can bring one up instead of failing on the observation error.
+    with pytest.raises(RuntimeManagerError, match="reached launch"):
+        manager.start("move-arm-by-ee", "mujoco")
+
+
+def test_start_refuses_when_previous_flow_is_live(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    _previous_generation(manager)
+    monkeypatch.setattr(manager, "_flow_running", lambda flow: True)
+
+    with pytest.raises(RuntimeManagerError, match="Previous Dora flow is still running"):
+        manager.start("move-arm-by-ee", "mujoco")
+
+
 def test_start_rejects_node_that_does_not_match_lock(tmp_path: Path) -> None:
     catalog, runtime, logs, states = _setup(tmp_path)
     bundle = catalog.root / "move-arm-by-ee"

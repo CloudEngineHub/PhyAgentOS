@@ -158,3 +158,26 @@ async def test_runtime_changed_during_get_preserves_new_state_and_reports_no_rel
     assert report.unresolved
     assert states.load(state.skill_name).active_invocations == state.active_invocations
     assert states.load(state.skill_name).active_task_bindings == state.active_task_bindings
+
+
+async def test_missing_runtime_state_is_reported_not_raised(tmp_path):
+    from PhyAgentOS.forge.task import AgentTaskStore
+
+    states = RuntimeStateStore(tmp_path / "states")
+    report = await reconcile_runtime_references(
+        "never-started", states=states, tasks=AgentTaskStore(tmp_path / "workspace")
+    )
+    assert not report.released_invocations and not report.released_bindings
+    assert any("no runtime state" in reason for reason in report.unresolved)
+
+
+async def test_busy_skill_lock_is_reported_not_raised(tmp_path):
+    from PhyAgentOS.forge.task import AgentTaskStore
+    from PhyAgentOS.skill_runtime.locking import SkillOperationLock
+
+    states = RuntimeStateStore(tmp_path / "states")
+    with SkillOperationLock(states.root, "busy"):
+        report = await reconcile_runtime_references(
+            "busy", states=states, tasks=AgentTaskStore(tmp_path / "workspace")
+        )
+    assert any("lifecycle operation" in reason for reason in report.unresolved)

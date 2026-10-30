@@ -142,7 +142,9 @@ updates execution facts without changing the task verdict, and releases a termin
 task's binding only when all its remote executions have confirmed terminal states.
 Agent startup uses the same recovery; normal `skill stop` retries it before checking
 the active-reference guard. Unreachable or replaced Gateways, missing task journals
-and unknown remote states retain references. Reconciliation sends no control POSTs.
+and unknown remote states retain references. A busy lifecycle lock or a missing
+Runtime state is reported as retained, never raised: recovery must not block agent
+startup or a non-forced stop. Reconciliation sends no control POSTs.
 Interaction-governed tasks retain their supervisor recovery boundary.
 
 Stop verifies Dora flow absence after the command returns. Missing Dora, failed
@@ -150,12 +152,15 @@ queries and malformed JSON are observation errors, not proof of termination.
 `skill stop --force` additionally terminates owned Linux processes with TERM/KILL
 and verifies their exit before clearing references; it never shuts down shared Dora
 services. Failed verification retains references and reports failure. A new runtime
-generation cannot overwrite outstanding references or known live processes.
+generation cannot overwrite outstanding references or known live processes; it is
+refused only when the previous Dora flow is confirmed live. On a cold machine whose
+coordinator is not running, `start` proceeds and brings the coordinator up itself.
 
 Newly launched nodes receive `PAOS_RUNTIME_INSTANCE_ID` in their dataflow environment,
 including when a shared daemon starts them. Linux tracking discovers same-user
 processes carrying that exact marker, records boot/PID/start-time identities, and
 uses pidfds for cleanup so detached children and PID reuse are handled separately.
+Builds without `os.pidfd_open` fall back to `kill` after re-checking the start time.
 Nodes must preserve the marker in child environments and should `exec` their final
 program. This is cooperative tracking, not cgroup containment: children that remove
 the marker before discovery or cannot expose their environment may not be found.

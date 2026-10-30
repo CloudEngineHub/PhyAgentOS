@@ -110,9 +110,16 @@ class RuntimeManager:
             and previous.profile == profile_name
             and previous.status in {"starting", "running"}
         ):
-            report = self.status(skill_name)
-            if report.ready:
-                return report.state  # type: ignore[return-value]
+            try:
+                report = self.status(skill_name)
+            except RuntimeManagerError as exc:
+                # A reboot leaves the old state saying "running" while no Dora
+                # coordinator exists, so readiness cannot be observed. Start
+                # must still proceed: it brings the coordinator up itself.
+                self._log(skill_name, f"cannot observe previous Runtime: {self._safe_error(exc)}")
+            else:
+                if report.ready:
+                    return report.state  # type: ignore[return-value]
 
         if previous is not None:
             remnants = RuntimeProcessTracker(self.state_store.root, previous.runtime_instance_id).snapshot()
@@ -121,7 +128,7 @@ class RuntimeManager:
                     "Previous Runtime still owns processes or execution references; "
                     "run skill reconcile or skill stop --force before starting a new generation"
                 )
-            if self._flow_running(previous.flow_name):
+            if self._flow_maybe_running(previous.flow_name, skill_name):
                 raise RuntimeManagerError("Previous Dora flow is still running; stop it before restarting")
 
         try:
@@ -558,6 +565,19 @@ class RuntimeManager:
         return self._has_active_flow(
             self._parse_flow_list(result.stdout or ""), flow_name
         )
+
+    def _flow_maybe_running(self, flow_name: str, skill_name: str) -> bool:
+        """Best-effort check of a previous generation before relaunching.
+
+        A cold machine has no Dora coordinator yet, so ``dora list`` fails even
+        though no flow can be running. Refusing to start on that observation
+        would deadlock the only path that brings the coordinator up.
+        """
+        try:
+            return self._flow_running(flow_name)
+        except RuntimeManagerError as exc:
+            self._log(skill_name, f"cannot observe previous flow {flow_name}: {self._safe_error(exc)}")
+            return False
 
     @staticmethod
     def _parse_flow_list(output: str) -> list[dict[str, Any]]:

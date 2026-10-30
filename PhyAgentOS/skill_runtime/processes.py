@@ -78,18 +78,31 @@ class RuntimeProcessTracker:
         return found
 
     def _signal(self, pid: int, start: str, signum: int) -> None:
-        try:
-            # pidfd pins the target across PID recycling between check and kill.
-            fd = os.pidfd_open(pid)
-        except ProcessLookupError:
+        # pidfd pins the target across PID recycling between check and kill, but
+        # some Python builds (notably Anaconda) compile it out. Fall back to a
+        # plain kill instead of failing the whole cleanup.
+        open_pidfd = getattr(os, "pidfd_open", None)
+        send_pidfd = getattr(signal, "pidfd_send_signal", None)
+        if open_pidfd is not None and send_pidfd is not None:
+            try:
+                fd = open_pidfd(pid)
+            except ProcessLookupError:
+                return
+            try:
+                if self._identity(pid) == start:
+                    send_pidfd(fd, signum)
+            except ProcessLookupError:
+                pass
+            finally:
+                os.close(fd)
             return
+        # Without pidfd the start-time re-check is the only guard; it narrows
+        # the reuse window but cannot close it.
         try:
             if self._identity(pid) == start:
-                signal.pidfd_send_signal(fd, signum)
+                os.kill(pid, signum)
         except ProcessLookupError:
             pass
-        finally:
-            os.close(fd)
 
     def terminate(self, *, timeout_s: float = 2.0) -> dict[int, str]:
         if not self.supported:
