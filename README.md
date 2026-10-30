@@ -265,6 +265,11 @@ After the motion task has finished:
 paos skill stop robot-control-sim
 ```
 
+Normal stop first reconciles retained execution references in the configured workspace.
+Use `paos skill reconcile robot-control-sim --workspace /path/to/workspace` to retry recovery explicitly.
+Unconfirmed actions remain protected; `--force` explicitly authorizes runtime termination.
+See [runtime recovery and process ownership](docs/user_development_guide/track_b/RUNTIME.md#runtime-recovery-and-process-ownership) for platform limits.
+
 ### Extend this example
 
 - [TrackB framework guide](docs/user_development_guide/track_b/README.md): architecture, repository catalog and Node protocols.

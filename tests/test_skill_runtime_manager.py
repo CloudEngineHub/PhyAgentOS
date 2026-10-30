@@ -146,6 +146,7 @@ def test_start_uses_named_attached_launcher_for_relative_mujoco_dataflow(
     rendered = (cwd / "dataflow.yaml").read_text()
     assert "${FORGE_RUNTIME_BIN}" not in rendered
     assert f"path: {manager.runtime_root}/gateway" in rendered
+    assert yaml.safe_load(rendered)["nodes"][0]["env"]["PAOS_RUNTIME_INSTANCE_ID"] == state.runtime_instance_id
 
 
 def test_start_is_idempotent_when_live_runtime_is_ready(
